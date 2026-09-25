@@ -95,6 +95,7 @@ body.home footer .socials a:nth-child(5)::before{content:"@"!important;font-size
 
 @media(max-width:700px){.contact-details{font-size:10px;max-width:280px}.home footer .contact-details{margin-top:var(--space-2)}}
 .home .hero h1{writing-mode:horizontal-tb!important;transform:none!important;}
+
 html,
 body{
   max-width:100%;
@@ -104,7 +105,11 @@ header{
   position:fixed!important;
   top:0!important;
   left:50%!important;
-  width:min(100%,1600px)!important;
+  /* The banner is the viewport-wide surface.  Limiting it to 1600px created
+     visible empty gutters on wide displays.  Its inner padding still keeps
+     the brand and controls on the shared content line. */
+  width:100%!important;
+  max-width:none!important;
   transform:translateX(-50%)!important;
 }
 body{padding-top:var(--space-9);}
@@ -2481,7 +2486,7 @@ footer .socials a,.menu-socials a,.site-search-icons a{width:2.75rem!important;h
 .work-detail-info .work-heading h1>small,.work-title-zh{margin-top:var(--space-4);font:700 .56em/1.3 Manrope,Arial,sans-serif;letter-spacing:-.02em}
 .works-overview .works-year-filter{flex:0 0 20%!important;width:20%!important;min-width:0!important;max-width:20%!important;padding-right:var(--space-5)!important;background-position:right var(--space-3) center!important}
 .about-page .artist-switch{margin-top:var(--space-5)!important;margin-bottom:var(--space-4)!important}
-.intro-screen small{margin-top:var(--space-2)!important;color:#adf203!important;font-size:clamp(19px,2.7vw,40px)!important;font-weight:900!important}
+.intro-screen small{margin-top:var(--space-2)!important;color:#c6ff34!important;font-size:clamp(19px,2.7vw,40px)!important;font-weight:900!important}
 @media (max-width:47.9375rem){
   :root{--safe-top:env(safe-area-inset-top,0px);--safe-right:env(safe-area-inset-right,0px);--safe-bottom:env(safe-area-inset-bottom,0px);--safe-left:env(safe-area-inset-left,0px)}
   html{background:#fff;overscroll-behavior-y:none}
@@ -2632,7 +2637,7 @@ body.home #works .work-panel,body.home #works .home-work-image{filter:none!impor
   font-size:clamp(2rem,11.5vw,8.125rem)!important;
 }
 .intro-screen small{
-  color:#adf203!important;
+  color:#c6ff34!important;
   font-weight:900!important;
   -webkit-text-stroke:.7px currentColor;
   text-shadow:.25px 0 currentColor,-.25px 0 currentColor;
@@ -2760,6 +2765,7 @@ body.page-transition-leaving{
 .key-back:hover .back-key-image{transform:translateX(-6px);opacity:.7}
 @media(max-width:700px){.key-back .back-key-image{width:43px!important}.page-back.key-back .back-key-image{width:53px!important}}
 
+/* Reserve a dedicated lane for the key so its right edge never meets page copy. */
 :root{--back-key-clearance:clamp(4.25rem,7.2vw,7rem)}
 .page.has-page-back{padding-left:calc(var(--responsive-pad) + var(--back-key-clearance))!important}
 @media(min-width:64rem){.page.has-page-back{padding-left:max(calc(var(--responsive-pad) + var(--space-9)),calc(var(--responsive-pad) + var(--back-key-clearance)))!important}}
@@ -2782,6 +2788,46 @@ body.page-transition-leaving{
 .work-detail-info .work-data{gap:var(--space-2)!important}
 .work-detail-info .work-contact-me{margin-top:var(--space-7)!important}
 
+/* Work-image changes are an opacity transition only: never zoom the artwork. */
+.work-detail-page .work-main picture,
+.work-detail-page .work-main img{
+  transform:none!important;
+}
+
+/* Home only: shrink content itself to 80% while retaining the original
+   section spacing. The opening film and horizontal ticker are deliberately
+   not selected. */
+body.home header > *,
+body.home main > section:not(.horizontal-image-ticker),
+body.home footer > *{
+  transform:scale(.8);
+  transform-origin:center center;
+}
+
+/* The opening film always occupies the complete viewport width. */
+body.home > .video-banner--ambient,
+body.home > .video-banner--ambient .video-banner__foreground{
+  width:100vw!important;
+  max-width:none!important;
+  margin-inline:0!important;
+}
+
+/* A single, shorter rhythm between homepage sections. Lines mark each new
+   content block without changing the opening film or moving image strip. */
+body.home main{--home-section-space:clamp(3rem,7.2vw,6rem)}
+body.home main > section{margin:0!important}
+body.home main > section:not(.horizontal-image-ticker){
+  padding-top:var(--home-section-space)!important;
+  padding-bottom:var(--home-section-space)!important;
+}
+body.home main > section + section{
+  border-top:1px solid rgba(17,17,17,.14);
+}
+body.home main > .horizontal-image-ticker{
+  border-top:1px solid rgba(17,17,17,.14);
+  border-bottom:1px solid rgba(17,17,17,.14);
+}
+
 /* Keep mobile page content below the previous-page key, rather than beside it. */
 @media(max-width:700px){
   .page.has-page-back{padding-left:var(--responsive-pad)!important}
@@ -2797,7 +2843,6 @@ body.page-transition-leaving{
 
 /* The desktop search mark sits closer to the outer edge of the header. */
 @media(min-width:701px){.site-search-toggle{transform:translateX(var(--space-2))}}
-
 /* Home image strip between the introduction film and Artist section. */
 .horizontal-image-ticker{width:100%;overflow:hidden;background:#fff;line-height:0}
 .horizontal-image-ticker__track{display:flex;width:max-content;animation:horizontal-image-ticker 34s linear infinite;will-change:transform}
@@ -2805,16 +2850,1050 @@ body.page-transition-leaving{
 @keyframes horizontal-image-ticker{to{transform:translateX(-50%)}}
 @media(prefers-reduced-motion:reduce){.horizontal-image-ticker__track{animation:none}}
 
-/* Test-site page entrance: image, heading, then each information row. */
-@media(prefers-reduced-motion:no-preference){
-  body.page-sequence .page-enter-image,
-  body.page-sequence .page-enter-title,
-  body.page-sequence .page-enter-detail{
-    opacity:0;
-    transform:translateY(16px);
-  }
-  body.page-sequence-ready .page-enter-image{animation:page-sequence-in .5s cubic-bezier(.22,1,.36,1) .05s both}
-  body.page-sequence-ready .page-enter-title{animation:page-sequence-in .45s cubic-bezier(.22,1,.36,1) .32s both}
-  body.page-sequence-ready .page-enter-detail{animation:page-sequence-in .42s cubic-bezier(.22,1,.36,1) var(--page-enter-delay,.52s) both}
-  @keyframes page-sequence-in{to{opacity:1;transform:translateY(0)}}
+/* Bottom scroll walker shared by desktop and mobile. */
+.scroll-walker{position:fixed;z-index:20001;left:0;bottom:max(24px,calc(env(safe-area-inset-bottom) + 16px));width:12vh;height:12vh;min-width:72px;min-height:72px;max-width:168px;max-height:168px;pointer-events:none;will-change:transform;transition:opacity .3s ease,visibility 0s linear 0s}
+body.home.intro-active .scroll-walker{opacity:0;visibility:hidden;transition:opacity .2s ease,visibility 0s linear .2s}
+.scroll-walker__idle,.scroll-walker__canvas{display:block;width:100%;height:100%;object-fit:contain}
+.scroll-walker__walk{display:none!important}.scroll-walker__canvas{display:none}.scroll-walker.is-walking .scroll-walker__canvas{display:block}.scroll-walker.is-walking .scroll-walker__idle{display:none}
+@media(prefers-reduced-motion:reduce){.scroll-walker__canvas{display:none!important}.scroll-walker__idle{display:block!important}}
+
+/* Confirmed layout rules — 2026-09-20. These declarations intentionally
+   override earlier experiments so the selected visual system is unambiguous. */
+
+/* Only the five editorial home sections are optically reduced. The header,
+   opening film, moving image strip, and footer always retain their own size. */
+body.home header > *,
+body.home footer > *,
+body.home main > section:not(#artist):not(#works):not(#news):not(#press):not(.series-entry-section){
+  transform:none!important;
 }
+body.home #artist,
+body.home .series-entry-section,
+body.home #works,
+body.home #news,
+body.home #press{
+  /* Do not transform the section itself: sticky labels stop behaving like
+     viewport markers when their containing section is transformed. */
+  transform:none!important;
+}
+
+/* A consistent, shorter gap with a quiet divider at the start of each
+   editorial homepage section. */
+body.home main{--home-section-space:clamp(1.8rem,4.3vw,3.6rem)!important}
+body.home main > section:not(.horizontal-image-ticker){
+  padding-top:var(--home-section-space)!important;
+  padding-bottom:var(--home-section-space)!important;
+}
+body.home main > #artist,
+body.home main > #works,
+body.home main > #news,
+body.home main > #press,
+body.home main > .series-entry-section{
+  border-top:1px solid rgba(17,17,17,.11)!important;
+}
+
+/* Opening film: desktop preserves every edge of the film and uses its own
+   softly enlarged image only in the side space. */
+@media(min-width:48rem){
+  body.home > .video-banner--ambient{background:#fff!important}
+  body.home > .video-banner--ambient .video-banner__ambient{
+    display:block!important;opacity:1!important;visibility:visible!important;
+  }
+  body.home > .video-banner--ambient .video-banner__veil{
+    display:block!important;opacity:1!important;visibility:visible!important;
+  }
+  body.home > .video-banner--ambient .video-banner__foreground{
+    object-fit:contain!important;background:transparent!important;
+  }
+}
+/* Mobile deliberately stays simple: a complete, screen-width film on white,
+   with no enlarged or blurred copy behind it. */
+@media(max-width:47.9375rem){
+  body.home > .video-banner--ambient{width:100vw!important;height:auto!important;min-height:0!important;background:#fff!important}
+  body.home > .video-banner--ambient .video-banner__ambient,
+  body.home > .video-banner--ambient .video-banner__veil{display:none!important;opacity:0!important;visibility:hidden!important}
+  body.home > .video-banner--ambient .video-banner__foreground{width:100vw!important;height:auto!important;object-fit:contain!important;background:#fff!important;margin:0!important}
+}
+
+/* The second, Artist-area film never crops and has a plain white surround. */
+body.home .artist-film--ambient{background:#fff!important}
+body.home .artist-film--ambient .artist-film__ambient,
+body.home .artist-film--ambient .artist-film__veil{display:none!important}
+body.home .artist-film--ambient .artist-film__foreground{object-fit:contain!important;background:#fff!important;mask-image:none!important;-webkit-mask-image:none!important}
+
+/* Homepage works: two equal, compact cards on phones. */
+@media(max-width:47.9375rem){
+  body.home #works .work-stage{height:clamp(11rem,42vw,15rem)!important;max-height:none!important;gap:var(--space-3)!important;padding:0!important}
+  body.home #works .work-panel,body.home #works .work-panel.active,body.home #works .work-panel:nth-child(n){flex:0 0 calc((100% - var(--space-3))/2)!important;height:100%!important;min-height:100%!important}
+  body.home #works .work-panel>span{bottom:calc(-1 * var(--space-6))!important;color:#111!important;font-size:clamp(.7rem,3vw,.95rem)!important}
+  body.home #works .work-panel img{object-fit:contain!important}
+}
+
+/* Works overview: three columns on desktop; a stable two-column grid on
+   phones. The year chooser and search field share the same left-aligned row. */
+.works-overview .works-tools{display:flex!important;align-items:center!important;justify-content:flex-start!important;grid-column:1 / -1!important;gap:var(--space-3)!important}
+.works-overview .works-year-filter{flex:0 0 20%!important;width:20%!important;min-width:7rem!important;max-width:10rem!important}
+.works-overview .works-search{flex:0 1 18rem!important}
+@media(min-width:64rem){.works-overview .works-image-grid,.works-overview .static-works-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
+@media(max-width:47.9375rem){
+  .works-overview .works-image-grid,.works-overview .static-works-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:var(--space-4)!important}
+  .works-overview .works-image-grid figure{height:auto!important;aspect-ratio:1/1!important}
+  .works-overview .works-tools{flex-wrap:nowrap!important}
+  .works-overview .works-year-filter{flex:0 0 20%!important;min-width:0!important;width:20%!important}
+  .works-overview .works-search{flex:1 1 auto!important;min-width:0!important}
+}
+
+/* All artwork titles are always two separate, complete lines. */
+.work-detail-info .work-heading h1{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:var(--space-3)!important;min-width:0!important}
+.work-detail-info .work-heading .work-title-en,.work-detail-info .work-heading .work-title-zh{display:block!important;white-space:normal!important;overflow-wrap:normal!important;word-break:normal!important}
+
+/* Side labels use the header's left rhythm on desktop and the true screen
+   edge on phones. Footer content follows the same horizontal rhythm. */
+@media(min-width:48rem){
+  body.home .side-section>.side-title{justify-self:start!important;left:0!important}
+  body.home footer{align-items:flex-start!important;text-align:left!important}
+}
+@media(max-width:47.9375rem){
+  body.home .side-section>.side-title{left:0!important;margin-left:0!important;justify-self:start!important;font-size:clamp(1rem,4.8vw,1.35rem)!important}
+}
+
+/* Keep each vertical home label in view while its own section is passing.
+   This is separate from the scale rule above: the label is sticky, not a
+   static decoration. */
+body.home main > .side-section > .side-title{
+  position:sticky!important;
+  top:5.75rem!important;
+  align-self:start!important;
+  height:max-content!important;
+  transform:rotate(180deg)!important;
+  /* The text's own left edge—not a centred label lane—shares the header's
+     left content edge. */
+  left:0!important;
+  width:max-content!important;
+  justify-self:start!important;
+  text-align:left!important;
+}
+/* The title occupies its original narrow left lane. Content remains in its
+   original right-hand column, unaffected by the sticky title. */
+body.home main > .side-section > .side-title{
+  z-index:2!important;
+  pointer-events:auto!important;
+}
+@media(max-width:47.9375rem){
+  body.home main > .side-section > .side-title{top:4.75rem!important}
+}
+
+/* Shared black display type: keep editorial hierarchy visibly stronger than
+   body copy without changing dates, metadata, buttons, or navigation. */
+h1,h2,h3,
+.side-title,.contact-title,
+.work-panel>span,
+.works-card-meta strong,
+.work-list h2,
+.timeline h2,
+.news h3,.press h3,.press-card h3,
+.related-works a>span:last-child{
+  font-weight:900!important;
+}
+
+/* Header / banner height: reduced by 30% from the previous desktop and
+   mobile values. The spacer and sticky labels share the same measurement. */
+:root{--site-header-height:4rem}
+header{height:var(--site-header-height)!important}
+.video-spacer{height:var(--site-header-height)!important;min-height:var(--site-header-height)!important;max-height:var(--site-header-height)!important}
+body.home main > .side-section > .side-title{top:calc(var(--site-header-height) + var(--space-3))!important}
+@media(max-width:47.9375rem){
+  :root{--site-header-height:3.3125rem}
+  header{height:var(--site-header-height)!important}
+  .video-spacer{height:var(--site-header-height)!important;min-height:var(--site-header-height)!important;max-height:var(--site-header-height)!important}
+  body.home main > .side-section > .side-title{top:calc(var(--site-header-height) + var(--space-3))!important}
+}
+
+/* The header now precedes the first film, so no artificial gap is needed. */
+body.home .video-spacer{display:none!important}
+
+/* Home alignment system. Titles sit in the left lane and all section material
+   starts in the right lane. The material retains the existing 80% scale,
+   without centring or widening it. */
+:root{--home-content-scale:.8}
+body.home .side-section>.side-title{left:0!important;justify-self:start!important}
+body.home .contact-title{left:var(--responsive-pad)!important}
+body.home main > .side-section{
+  grid-template-columns:var(--home-side-label-width) minmax(0,1fr)!important;
+  column-gap:var(--space-7)!important;
+  padding-left:0!important;
+}
+body.home main > .side-section > .side-title{grid-column:1!important;grid-row:1!important}
+body.home main > .side-section > :not(.side-title){
+  grid-column:2!important;
+  width:auto!important;
+  min-width:0!important;
+  max-width:100%!important;
+  margin-left:0!important;
+  margin-right:0!important;
+  zoom:var(--home-content-scale);
+}
+body.home main > .side-section > :not(.side-title) img,
+body.home main > .side-section > :not(.side-title) picture,
+body.home main > .side-section > :not(.side-title) video{max-width:100%!important}
+/* Non-titled content uses the header P gutter on both sides. The full-width
+   opening film deliberately remains an earlier, explicit exception. */
+body.home main > section:not(.side-section):not(.horizontal-image-ticker){
+  width:100%;
+  max-width:100%;
+}
+@media(max-width:47.9375rem){:root{--home-content-scale:1}}
+
+/* The copied exhibition strip stays inside the page column instead of using
+   viewport width. */
+.exhibition-image-ticker{
+  height:20svh!important;
+  min-height:0!important;
+  max-height:20svh!important;
+  margin:var(--space-6) 0!important;
+  border:0!important;
+}
+.exhibition-image-ticker .horizontal-image-ticker__track{height:100%!important}
+.exhibition-image-ticker img{
+  flex:0 0 100vw!important;
+  width:100vw!important;
+  height:100%!important;
+  object-fit:cover!important;
+}
+
+/* Press uses a deliberately quieter reading scale than headlines elsewhere. */
+.press-page .press-card h3,
+.press-page .press-list h3{
+  font-size:clamp(.875rem,1vw,1rem)!important;
+  line-height:1.38!important;
+  letter-spacing:-.012em!important;
+}
+.press-page .press-card p,
+.press-page .press-list p{font-size:.75rem!important;line-height:1.6!important}
+.press-page .press-card time,
+.press-page .press-list time{font-size:.6875rem!important}
+
+/* The content wrapper keeps the sticky label's grid row as tall as its own
+   whole section. No homepage section is clipped by its outer container. */
+body.home main > .side-section{overflow:visible!important}
+body.home main > .side-section > .side-content{overflow:visible!important}
+
+/* Press keeps the full image composition instead of cropping it to portrait. */
+.press-side-image{aspect-ratio:auto!important;overflow:visible!important}
+.press-side-image img{height:auto!important;object-fit:contain!important}
+
+/* Homepage editorial labels: the full-height outer rail belongs to its own
+   section, while the visible word sticks beneath the header until that
+   section ends. This avoids the grid-item sticky limitation and keeps every
+   label paired with its own content. */
+body.home main > .side-section > .side-title{
+  position:absolute!important;
+  top:0!important;
+  left:0!important;
+  z-index:3!important;
+  display:block!important;
+  width:var(--home-side-label-width)!important;
+  height:100%!important;
+  margin:0!important;
+  writing-mode:vertical-rl!important;
+  transform:rotate(180deg)!important;
+  pointer-events:auto!important;
+}
+body.home main > .side-section > .side-title span{
+  position:sticky!important;
+  top:calc(var(--site-header-height) + var(--space-3))!important;
+  display:block!important;
+  width:max-content!important;
+  height:max-content!important;
+  transform:none!important;
+}
+@media(max-width:47.9375rem){
+  body.home main > .side-section > .side-title span{top:calc(var(--site-header-height) + var(--space-3))!important}
+}
+
+/* The homepage content remains at its natural 1:1 scale. Labels are placed
+   independently, so their motion never changes the proportions of artwork,
+   text, or media. */
+body.home main > .side-section > :not(.side-title){zoom:1!important}
+body.home main > .side-section > .side-title{
+  top:var(--home-side-title-y, 0px)!important;
+  height:auto!important;
+  writing-mode:horizontal-tb!important;
+  transform:none!important;
+}
+body.home main > .side-section > .side-title span{
+  position:static!important;
+  writing-mode:vertical-rl!important;
+  transform:rotate(180deg)!important;
+}
+
+/* Native sticky keeps the label and normal page scrolling in the same rhythm.
+   Each title remains in its own section's left rail and cannot cross into the
+   next section. */
+body.home main > .side-section > .side-title{
+  position:sticky!important;
+  top:calc(var(--site-header-height) + var(--space-3))!important;
+  left:0!important;
+  align-self:start!important;
+  grid-column:1!important;
+  grid-row:1!important;
+  width:max-content!important;
+  height:max-content!important;
+  writing-mode:vertical-rl!important;
+  transform:rotate(180deg)!important;
+}
+body.home main > .side-section > .side-title span{
+  position:static!important;
+  writing-mode:inherit!important;
+  transform:none!important;
+}
+
+/* Every editorial home section uses the same centred content field on
+   desktop. The title rail remains outside this field on the left. */
+:root{--home-content-max:72rem}
+@media(min-width:48rem){
+  body.home main > .side-section > .side-content{
+    width:min(100%,var(--home-content-max))!important;
+    margin-inline:auto!important;
+    justify-self:center!important;
+  }
+}
+
+/* One page-level rail avoids grid sticky crossover: its word is always the
+   label for the section currently passing the header. Original rail links
+   remain in the document for their destinations, but are not drawn twice. */
+body.home main > .side-section > .side-title{visibility:hidden!important;pointer-events:none!important}
+.home-active-side-title{font-size:clamp(1.7rem,3.04vw,3.2rem)!important}
+/* Homepage content uses the shared centred field at 80%; rails and full-width
+   media stay at their measured positions so every established alignment line
+   remains intact. */
+@media(min-width:48rem){
+  body.home main > .side-section > :not(.side-title){zoom:.8!important}
+  body.home .hero > div{zoom:.8!important}
+  body.home .donut-sequence__stage{height:80vh;min-height:560px}
+}
+.home-active-side-title{
+  position:fixed;
+  top:calc(var(--site-header-height) + var(--space-3));
+  left:var(--responsive-pad);
+  z-index:30;
+  display:block;
+  color:#111;
+  font-size:clamp(2.125rem,3.8vw,4rem);
+  font-weight:900;
+  line-height:1;
+  letter-spacing:-.02em;
+  writing-mode:vertical-rl;
+  transform:rotate(180deg);
+  transition:opacity .16s ease;
+}
+.home-active-side-title[hidden]{display:none!important}
+@media(min-width:48rem){
+  body.home main > .side-section{grid-template-columns:minmax(0,1fr)!important}
+  body.home main > .side-section > .side-content{
+    grid-column:1 / -1!important;
+    width:min(var(--home-content-max),calc(100% - var(--home-side-label-width) - var(--space-7)))!important;
+    max-width:calc(100% - var(--home-side-label-width) - var(--space-7))!important;
+    margin-inline:auto!important;
+  }
+  body.home #artist .side-content{justify-self:center!important}
+}
+@media(max-width:47.9375rem){
+  .home-active-side-title{top:calc(var(--site-header-height) + var(--space-3));font-size:clamp(1rem,4.8vw,1.35rem)}
+}
+
+/* Each section owns its label. It begins at that section's top edge, then the
+   inner word naturally sticks below the header until the section finishes. */
+.home-active-side-title{display:none!important}
+body.home main > .side-section > .side-title{
+  position:absolute!important;
+  top:0!important;
+  left:0!important;
+  z-index:3!important;
+  display:block!important;
+  visibility:visible!important;
+  pointer-events:auto!important;
+  width:var(--home-side-label-width)!important;
+  height:100%!important;
+  margin:0!important;
+  writing-mode:horizontal-tb!important;
+  transform:none!important;
+}
+body.home main > .side-section > .side-title span{
+  position:sticky!important;
+  top:calc(var(--site-header-height) + var(--space-3))!important;
+  display:block!important;
+  width:max-content!important;
+  height:max-content!important;
+  writing-mode:vertical-rl!important;
+  transform:rotate(180deg)!important;
+  transform-origin:center!important;
+}
+@media(min-width:48rem){
+  body.home #artist .artist-detail{margin-inline:auto!important}
+}
+
+/* Phone image loading is intentionally a blank white frame, not a skeleton. */
+@media(max-width:47.9375rem){
+  .mobile-image-shell,.mobile-image-shell::after{background:#fff!important;animation:none!important}
+  .mobile-image-shell::after{display:none!important}
+  .mobile-image-shell picture,.mobile-image-shell>img{opacity:1!important}
+}
+
+/* Final editorial layout repairs — these rules intentionally sit last so
+   legacy experiments cannot change the established page geometry. */
+body.home main > .side-section > .side-title{
+  position:absolute!important;
+  top:var(--home-side-title-y,0px)!important;
+  left:0!important;
+  height:auto!important;
+  width:var(--home-side-label-width)!important;
+  writing-mode:horizontal-tb!important;
+  transform:none!important;
+  visibility:visible!important;
+  pointer-events:auto!important;
+}
+body.home main > .side-section > .side-title span{
+  position:static!important;
+  display:block!important;
+  width:max-content!important;
+  height:max-content!important;
+  writing-mode:vertical-rl!important;
+  transform:rotate(180deg)!important;
+}
+
+/* Works overview cards always read top-to-bottom: artwork, then title/year. */
+.works-overview .works-image-grid > a.work-card{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  gap:var(--space-4)!important;
+  overflow:visible!important;
+}
+.works-overview .works-image-grid > a.work-card figure{
+  order:0!important;
+  width:100%!important;
+  max-width:none!important;
+  height:auto!important;
+  aspect-ratio:1 / 1!important;
+  margin:0!important;
+  overflow:hidden!important;
+}
+.works-overview .works-image-grid > a.work-card figure img{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  object-fit:contain!important;
+}
+.works-overview .works-image-grid > a.work-card .works-card-meta{
+  order:1!important;
+  display:flex!important;
+  flex-direction:row!important;
+  align-items:baseline!important;
+  justify-content:space-between!important;
+  gap:var(--space-3)!important;
+  width:100%!important;
+  min-width:0!important;
+  padding:0!important;
+}
+.works-overview .works-image-grid > a.work-card .works-card-meta strong{
+  min-width:0!important;
+  overflow-wrap:normal!important;
+  word-break:normal!important;
+}
+.works-overview .works-image-grid > a.work-card .works-card-meta time{
+  flex:0 0 auto!important;
+  white-space:nowrap!important;
+}
+
+/* The previous-page mark remains clear of content at its new compact size. */
+.key-back .back-key-image{width:clamp(2rem,3.4vw,3.625rem)!important}
+.page-back.key-back .back-key-image{width:clamp(2.25rem,3.8vw,4rem)!important}
+@media(max-width:700px){
+  .key-back .back-key-image,.page-back.key-back .back-key-image{width:2.25rem!important}
+}
+
+/* News keeps the established ticker height, but never cuts the artwork image. */
+.exhibition-image-ticker .horizontal-image-ticker__track img{
+  width:auto!important;
+  max-width:none!important;
+  height:100%!important;
+  object-fit:contain!important;
+}
+
+/* The Press page repeats its homepage studio image as a complete composition. */
+.press-page-media{
+  width:min(100%,42rem);
+  margin:var(--space-8) auto 0;
+  background:#fff;
+}
+.press-page-media img{
+  display:block;
+  width:100%;
+  height:auto;
+  object-fit:contain;
+}
+.press-page-layout{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(17rem,42%);
+  gap:var(--space-8);
+  align-items:start;
+}
+.press-page-layout .press-list{grid-column:1;grid-row:1}
+.press-page-layout .press-page-media{grid-column:2;grid-row:1;margin:0;width:100%}
+@media(max-width:47.9375rem){
+  .press-page-layout{display:flex;flex-direction:column;gap:var(--space-6)}
+  .press-page-layout .press-page-media{order:0}
+  .press-page-layout .press-list{order:1;width:100%}
+}
+@media(min-width:48rem){
+  body.home #press .press-side-image{
+    width:min(100%,22rem)!important;
+    justify-self:end!important;
+  }
+}
+
+/* A section title moves inside its own full-height rail. The rail clips only
+   the title word, so it cannot visually cross either horizontal divider. */
+:root{--home-title-divider-clearance:32px}
+body.home main > .side-section > .side-title{
+  top:0!important;
+  height:100%!important;
+  overflow:visible!important;
+  clip-path:none!important;
+}
+body.home main > .side-section > .side-title span{
+  position:absolute!important;
+  top:var(--home-side-title-y,0px)!important;
+  left:0!important;
+  transition:none!important;
+  will-change:top;
+}
+
+/* Works overview metadata: bilingual title forms one left column; year holds
+   the far-right edge of the same image-width row. */
+.works-overview .works-image-grid > a.work-card .works-card-meta{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  grid-template-rows:auto auto!important;
+  align-items:baseline!important;
+}
+.works-overview .works-image-grid > a.work-card .works-card-meta strong{
+  grid-column:1!important;
+  grid-row:1!important;
+}
+.works-overview .works-image-grid > a.work-card .works-card-meta span{
+  grid-column:1!important;
+  grid-row:2!important;
+}
+.works-overview .works-image-grid > a.work-card .works-card-meta time{
+  grid-column:2!important;
+  grid-row:1 / span 2!important;
+  align-self:center!important;
+}
+
+/* One large key size across every page and breakpoint. */
+.key-back .back-key-image,
+.page-back.key-back .back-key-image{width:3.625rem!important}
+@media(max-width:700px){
+  .key-back .back-key-image,
+  .page-back.key-back .back-key-image{width:3.625rem!important}
+}
+
+/* News / exhibitions strip: double the media field so the full artwork has
+   room to appear at twice its prior display size without clipping. */
+.exhibition-image-ticker{
+  height:40svh!important;
+  max-height:40svh!important;
+}
+.exhibition-image-ticker .horizontal-image-ticker__track{
+  display:flex!important;
+  width:max-content!important;
+  height:100%!important;
+  animation:exhibition-image-ticker-loop 26s linear infinite!important;
+  animation-play-state:running!important;
+  will-change:transform;
+}
+.exhibition-image-ticker .horizontal-image-ticker__track img{
+  flex:0 0 auto!important;
+  width:auto!important;
+  height:100%!important;
+  max-width:none!important;
+}
+@keyframes exhibition-image-ticker-loop{
+  from{transform:translate3d(0,0,0)}
+  to{transform:translate3d(-50%,0,0)}
+}
+@media(prefers-reduced-motion:reduce){
+  .exhibition-image-ticker .horizontal-image-ticker__track{animation:none!important}
+}
+
+/* The previous-page key uses the identical left reference line as the P in
+   the header brand, independently of the page content column. */
+.page.has-page-back > .page-back{
+  left:var(--responsive-pad)!important;
+}
+
+/* Contact is the final home rail: use the exact same left edge and lane
+   width as every other home-side title. */
+body.home footer .contact-title{
+  left:var(--responsive-pad)!important;
+  width:var(--home-side-label-width)!important;
+  transform:rotate(180deg)!important;
+}
+
+/* The studio portrait begins the News section itself; it has no divider
+   between the image and the News material. */
+body.home main > #news{border-top:0!important}
+body.home main > #news::before{
+  content:"";
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  height:1px;
+  background:#d8d8d8;
+  pointer-events:none;
+}
+body.home #news .home-image-break{
+  margin:0 0 var(--home-section-space)!important;
+}
+/* Keep the opening film and left-side labels at their designed scale. All
+   homepage content columns use one 90% reading scale. */
+body.home main > .side-section > .side-content{
+  zoom:.9!important;
+}
+
+/* The key is an overlay only. It must never shift an inner page's content
+   column to the right. */
+.page.has-page-back{
+  padding-left:var(--responsive-pad)!important;
+}
+@media(min-width:701px){
+  .page.has-page-back{
+    /* 58px key + 16px clear gap, above rather than beside the content. */
+    padding-top:calc(var(--space-10) + 4.625rem)!important;
+  }
+  .page.has-page-back > .page-back{
+    top:var(--space-4)!important;
+  }
+}
+
+/* Artist must use the same full-width page coordinate system as every other
+   inner page.  Its former 1440px cap made this one page centre itself on
+   wide displays and break the shared header/content alignment. */
+.about-page .page{max-width:100%!important}
+
+/* Artist introduction: keep the editorial group centred, while every portrait
+   sits inside a consistent square white frame without cropping the photograph. */
+.about-page .artist-tab-panel{
+  width:min(100%,77.5rem)!important;
+  margin-inline:auto!important;
+}
+.about-page .bio{
+  width:100%!important;
+  margin-inline:auto!important;
+  justify-content:center!important;
+}
+.about-page .portrait,
+.about-page .artist-photo-carousel{
+  width:min(100%,34rem)!important;
+  max-width:34rem!important;
+  aspect-ratio:1 / 1!important;
+  justify-self:center!important;
+  background:#fff!important;
+}
+.about-page .portrait img,
+.about-page .artist-photo-carousel img{
+  object-fit:contain!important;
+  background:#fff!important;
+}
+
+/* Works overview: one card per sculpture family. Colour/material variants
+   cross-fade through their first photographs inside the existing square frame. */
+.works-overview .work-card-carousel{position:relative!important;isolation:isolate!important;background:#fff!important}
+.works-overview .work-card-carousel .work-card-slide{
+  position:absolute!important;
+  inset:0!important;
+  display:block!important;
+  opacity:0!important;
+  transition:opacity .5s ease!important;
+}
+.works-overview .work-card-carousel .work-card-slide.is-active{opacity:1!important}
+.works-overview .work-card-carousel .work-card-slide picture,
+.works-overview .work-card-carousel .work-card-slide img{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  object-fit:contain!important;
+  background:#fff!important;
+}
+/* Centre the full text block. English title and year share the first line;
+   the Chinese title is centred directly beneath that line. */
+.works-overview .works-image-grid > a.work-card .works-card-meta{
+  grid-template-columns:minmax(0,max-content) auto!important;
+  justify-content:start!important;
+  column-gap:var(--space-2)!important;
+}
+.works-overview .works-image-grid > a.work-card .works-card-meta{
+  justify-content:center!important;
+  text-align:center!important;
+}
+.works-overview .works-image-grid > a.work-card .works-card-meta time{
+  grid-column:2!important;
+  grid-row:1!important;
+  align-self:baseline!important;
+}
+.works-overview .works-image-grid > a.work-card .works-card-meta span{
+  grid-column:1 / span 2!important;
+  grid-row:2!important;
+  justify-self:center!important;
+}
+
+/* Reduce only the Works card field. The page title and filter controls keep
+   their established scale and position. */
+.works-overview .works-image-grid{
+  width:90%!important;
+  margin-inline:auto!important;
+}
+.works-overview .works-image-grid > a.work-card .works-card-meta{
+  transform:scale(.9)!important;
+  transform-origin:top center!important;
+}
+
+/* The homepage Press call-to-action uses the same studio orange as every
+   other "view more..." link. */
+body.home #press .press-more{color:#ff5a1f!important}
+
+/* Homepage Contact rail: centre the vertical CONTACT word on the same
+   horizontal axis as the footer content group. */
+body.home footer .contact-title{
+  top:50%!important;
+  transform:translateY(-50%) rotate(180deg)!important;
+  font-weight:800!important;
+}
+
+/* Artist CV and Press share one fixed-width right gallery. Each original
+   photograph keeps its full ratio; spacing is controlled in one place. */
+:root{--artist-gallery-gap:var(--space-6);--artist-gallery-width:24rem}
+.artist-cv-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(16rem,var(--artist-gallery-width));gap:var(--space-8);align-items:start}
+.artist-side-gallery{display:grid;grid-template-columns:1fr;gap:var(--artist-gallery-gap);width:100%;margin:0}
+.artist-side-gallery figure{width:100%;margin:0;background:#fff}
+.artist-side-gallery img{display:block;width:100%;height:auto;object-fit:contain;background:#fff}
+.artist-cv-layout .artist-side-gallery{margin-top:var(--space-8)}
+.artist-cv h2{display:flex;align-items:center;min-height:3.5rem;padding:0}
+.intro-screen{overflow:hidden!important;animation:intro-out .6s linear 4.45s forwards!important}
+.intro-screen__walker{position:absolute;inset:0;z-index:2;overflow:hidden;background:transparent}
+.intro-screen__walker video{position:absolute;left:50%;top:0;width:auto;min-width:0;height:37%;max-width:none;transform:translate(-50%,27%);object-fit:contain;filter:none}
+.intro-screen>span{position:relative;z-index:4}
+.intro-screen .intro-word,.intro-screen .intro-gap{font:inherit;font-style:normal}
+.intro-screen>span{animation:none!important;opacity:1}
+@media(max-width:47.9375rem){.intro-screen__walker video{min-width:0;width:auto;height:30%;transform:translate(-50%,67%);border:0;outline:0;box-shadow:none;background:transparent;filter:none;clip-path:none}}
+.press-page-layout .artist-side-gallery{grid-column:2;grid-row:1}
+@media(max-width:47.9375rem){
+  .artist-cv-layout{display:grid!important;grid-template-columns:minmax(0,1fr) 25vw!important;gap:var(--space-5)!important;align-items:start!important}
+  .artist-cv-layout .artist-cv{grid-column:1;grid-row:1;min-width:0}
+  .artist-cv-layout .artist-gallery-ticker{display:block!important;grid-column:2;grid-row:1;align-self:start;width:100%!important;max-width:none!important;height:var(--artist-gallery-view-height,50svh);min-height:0}
+}
+
+/* The right-hand artist strip cycles upward behind its own top edge. */
+.press-page-layout{grid-template-columns:minmax(0,1fr) minmax(16rem,var(--artist-gallery-width))!important;align-items:start}
+.artist-gallery-ticker{display:block;position:relative;height:var(--artist-gallery-view-height,auto);min-height:0;overflow:hidden}
+.artist-gallery-ticker__track{display:grid;grid-template-columns:1fr;gap:var(--artist-gallery-gap);will-change:transform;animation:artist-gallery-scroll 240s linear infinite}
+@keyframes artist-gallery-scroll{to{transform:translateY(var(--artist-gallery-cycle,-50%))}}
+@media(prefers-reduced-motion:reduce){.artist-gallery-ticker__track{animation:none}}
+@media(max-width:47.9375rem){
+  .press-page-layout{display:grid!important;grid-template-columns:minmax(0,1fr) 25vw!important;gap:var(--space-5)!important;align-items:start!important}
+  .press-page-layout .press-list{grid-column:1;grid-row:1;width:100%!important}
+  .press-page-layout .artist-gallery-ticker{display:block!important;grid-column:2;grid-row:1;align-self:start;width:100%!important;max-width:none!important;height:var(--artist-gallery-view-height,50svh);min-height:0}
+  .about-page .artist-switch{margin-left:auto!important;margin-right:auto!important}
+  .page.has-page-back > .page-back{left:auto!important}
+}
+
+/* Footer contact information must be centred on every page, not only on the
+   homepage. */
+footer .contact-details{
+  justify-items:center!important;
+  align-self:center!important;
+  justify-self:center!important;
+  margin-left:auto!important;
+  margin-right:auto!important;
+  text-align:center!important;
+}
+footer .contact-details a{
+  margin-left:auto!important;
+  margin-right:auto!important;
+}
+
+/* 2026-09-22 homepage centering repairs: keep Artist content visually centred
+   in the same 1152px editorial field as the other home sections. */
+body.home #artist > .side-content{
+  width:min(100%,72rem)!important;
+  max-width:72rem!important;
+  margin-left:auto!important;
+  margin-right:auto!important;
+  justify-self:center!important;
+}
+body.home #artist .artist-detail{
+  width:100%!important;
+  max-width:72rem!important;
+  margin-left:auto!important;
+  margin-right:auto!important;
+  justify-content:center!important;
+}
+
+/* Artist is editorial content, not part of the narrow vertical-label column.
+   Let it span that grid, then centre it on the visible page at every width. */
+body.home #artist > .side-content{
+  grid-column:1 / -1!important;
+  width:min(72rem,calc(100% - (var(--responsive-pad) * 2)))!important;
+  max-width:72rem!important;
+  margin-inline:auto!important;
+  justify-self:center!important;
+  position:relative!important;
+  left:var(--artist-screen-offset,0px)!important;
+}
+@media(max-width:47.9375rem){
+  body.home #artist > .side-content{
+    width:calc(100% - (var(--responsive-pad) * 2))!important;
+  }
+}
+
+/* Mobile Series: enlarge the visual and crop only the surrounding white field
+   inside its existing frame. */
+@media(max-width:47.9375rem){
+  body.home .series-entry{
+    overflow:hidden!important;
+    height:clamp(16.25rem,72vw,20rem)!important;
+    min-height:clamp(16.25rem,72vw,20rem)!important;
+  }
+  body.home .series-entry img{
+    width:180%!important;
+    height:calc(100% - 44px)!important;
+    max-width:none!important;
+    object-fit:contain!important;
+    object-position:center!important;
+    transform:none!important;
+    margin-left:-40%!important;
+    margin-right:-40%!important;
+  }
+  body.home #press .press-layout{
+    display:flex!important;
+    flex-direction:column!important;
+    gap:4rem!important;
+  }
+  body.home #press .press-side-image{
+    display:block!important;
+    position:static!important;
+    width:100%!important;
+    aspect-ratio:1 / 1!important;
+    order:1!important;
+    margin:0!important;
+  }
+  body.home #press .press-list{
+    display:block!important;
+    order:2!important;
+    margin:0!important;
+  }
+  body.home #press > .side-content{zoom:1!important;}
+  body.home #artist .artist-detail > div{
+    padding-left:4.5rem!important;
+  }
+  body.home #artist .artist-detail h2{
+    font-size:clamp(1.4rem,6.3vw,1.72rem)!important;
+    line-height:1.18!important;
+  }
+  body.home #artist .artist-detail > div p{
+    font-size:.82rem!important;
+    line-height:1.65!important;
+  }
+  body.home #series .series-entry{
+    grid-template-rows:calc(100% - 44px) 44px!important;
+  }
+  .scroll-walker{
+    width:10.8vh!important;
+    height:10.8vh!important;
+    max-width:151px!important;
+    max-height:151px!important;
+  }
+}
+
+/* Homepage Works ticker — shared by desktop and phone. */
+body.home #works .work-stage.works-ticker-ready{
+  display:flex!important;
+  overflow:hidden!important;
+  scroll-snap-type:none!important;
+  gap:clamp(1rem,2vw,2rem)!important;
+  padding:0!important;
+  height:clamp(19rem,34vw,31rem)!important;
+  touch-action:pan-x!important;
+  cursor:grab;
+}
+body.home #works .work-stage.works-ticker-ready.dragging{cursor:grabbing}
+body.home #works .work-stage.works-ticker-ready .home-ticker-card{
+  flex:0 0 clamp(11.5rem,19vw,19rem)!important;
+  width:clamp(11.5rem,19vw,19rem)!important;
+  height:100%!important;
+  min-height:100%!important;
+  display:grid!important;
+  grid-template-rows:minmax(0,1fr) auto!important;
+  align-items:stretch!important;
+  padding:0!important;
+  overflow:hidden!important;
+}
+body.home #works .work-stage.works-ticker-ready .home-work-image{
+  position:relative!important;
+  inset:auto!important;
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  object-fit:contain!important;
+  object-position:center!important;
+  opacity:1!important;
+  transition:opacity .32s ease!important;
+}
+body.home #works .work-stage.works-ticker-ready .home-work-image.is-fading{opacity:0!important}
+body.home #works .work-stage.works-ticker-ready .home-ticker-card>span{
+  position:relative!important;
+  left:0!important;
+  bottom:0!important;
+  display:block!important;
+  padding:.55rem .65rem!important;
+  background:#fff!important;
+  color:#111!important;
+  font-size:clamp(.82rem,1.15vw,1.05rem)!important;
+}
+body.home #works .work-stage.works-ticker-ready .home-ticker-card>span small{
+  display:block!important;
+  margin-top:.25rem!important;
+  font-size:clamp(.78rem,1.1vw,1rem)!important;
+  font-weight:700!important;
+  letter-spacing:.04em!important;
+}
+body.home .work-swipe-hint,body.home .more-panel{display:none!important}
+body.home #works .section-head{position:relative!important;display:block!important;height:1.5rem!important}
+body.home #works .section-head a{position:absolute!important;top:0!important;right:0!important;margin:0!important}
+@media(max-width:47.9375rem){
+  body.home #works .work-stage.works-ticker-ready{height:clamp(14rem,62vw,18rem)!important;gap:var(--space-3)!important}
+  body.home #works .work-stage.works-ticker-ready .home-ticker-card{flex-basis:44vw!important;width:44vw!important}
+  body.home #works .work-stage.works-ticker-ready .home-ticker-card>span{font-size:.82rem!important}
+  body.home #works .work-stage.works-ticker-ready .home-ticker-card>span small{font-size:.8rem!important}
+}
+
+/* View-more links retain their own section colour; interaction is scale only. */
+a.view-more-link{
+  display:inline-block!important;
+  color:var(--view-more-base-color)!important;
+  transform-origin:center!important;
+  transition:transform .2s ease!important;
+}
+a.view-more-link:hover,a.view-more-link:focus-visible{
+  color:var(--view-more-base-color)!important;
+  opacity:1!important;
+  transform:scale(1.08)!important;
+}
+
+/* A centred single-column footer prevents page-specific grid rules from
+   shifting the shared contact information away from the viewport centre. */
+footer{
+  position:relative!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+  /* client width excludes the browser scrollbar; compensate so the content
+     is centred in the full visible viewport on every page. */
+  left:calc((100vw - 100%) / 2)!important;
+}
+footer .contact-details,footer .contact-details>*{
+  width:auto!important;
+  max-width:min(100%,42rem)!important;
+  justify-self:center!important;
+  justify-items:center!important;
+  text-align:center!important;
+}
+
+/* Homepage Works follows the other section calls to action: lower left. */
+body.home #works .works-more{
+  display:inline-block!important;
+  margin-top:var(--space-5)!important;
+  margin-left:0!important;
+}
+
+/* Controls retain their existing states; hover feedback is movement only. */
+.contact-form button{
+  color:#fff!important;
+  background:#111!important;
+  background-image:none!important;
+}
+.artist-switch button.active{
+  color:#fff!important;
+  background:#111!important;
+  background-image:none!important;
+  box-shadow:0 10px 24px rgba(17,17,17,.18)!important;
+}
+.contact-me:hover,.work-contact-me:hover{
+  color:#111!important;
+  background:#fff!important;
+  background-image:none!important;
+}
+
+/* CONTACT is a label, not a control, and shares the left title lane exactly. */
+body.home footer .contact-title{
+  left:calc(var(--responsive-pad) - ((100vw - 100%) / 2))!important;
+  width:var(--home-side-label-width)!important;
+  pointer-events:none!important;
+}
+
+/* Shared editorial call to action: one visual language, everywhere. */
+a.view-more-link,
+body.home .series-more{
+  display:inline-block!important;
+  color:#ff5a1f!important;
+  font:800 12px/1.2 Manrope,Arial,sans-serif!important;
+  letter-spacing:.02em!important;
+  text-decoration:none!important;
+  text-shadow:none!important;
+  -webkit-text-stroke:0!important;
+  border:0!important;
+  transform-origin:left center!important;
+  transition:transform .2s ease!important;
+}
+a.view-more-link:hover,a.view-more-link:focus-visible,
+body.home .series-more:hover,body.home .series-more:focus-visible{
+  color:#ff5a1f!important;
+  opacity:1!important;
+  transform:scale(1.08)!important;
+}
+body.home #artist .view-more-link,
+body.home #works .works-more,
+body.home #news .view-more-link,
+body.home #press .view-more-link,
+body.home #series .series-more{
+  margin-top:var(--space-5)!important;
+  margin-left:0!important;
+  justify-self:start!important;
+}
+}
+
+/* Keep the homepage depth field, with a calmer background enlargement. */
+:root{--ambient-scale:1.08}
+body.home .video-banner--ambient .video-banner__ambient{transform:scale(1.03)!important}
+
+/* The fixed homepage header is 64px high on desktop.  Keep the opening
+   film exactly flush to its lower edge rather than inheriting the former
+   global 96px body offset. */
+body.home{padding-top:var(--site-header-height)!important}
+
+/* Move the mobile opening character and title together without changing their gap. */
+@media(max-width:47.9375rem){
+  .intro-screen__walker video{transform:translate(-50%,67%) translateY(1.1vh)!important}
+  .intro-screen>span{transform:translateY(9.1vh)!important}
+}
+
+/* Gallery-like, quiet recovery page for static-host 404 responses. */
+.not-found{min-height:calc(100svh - var(--site-header-height));display:grid;grid-template-columns:minmax(0,1fr) minmax(14rem,.78fr);align-items:center;gap:clamp(2rem,8vw,9rem);padding-top:clamp(4rem,12vh,10rem)!important;padding-bottom:clamp(4rem,12vh,10rem)!important}
+.not-found__copy{max-width:44rem}.not-found h1{margin:var(--space-4) 0 var(--space-6);font-size:clamp(2.8rem,6.8vw,7rem);font-weight:800;line-height:1.03;letter-spacing:-.06em}.not-found h1 span{font-size:.5em;font-weight:500;letter-spacing:-.04em}.not-found__copy>p:not(.eyebrow){max-width:35rem;margin:0;color:var(--muted);font-size:clamp(.95rem,1.4vw,1.1rem)}.not-found__links{display:flex;flex-wrap:wrap;gap:var(--space-6);margin-top:var(--space-8)}.not-found__link{display:inline-flex;align-items:center;gap:.4em;border-bottom:1px solid currentColor;padding-bottom:var(--space-2);font-size:.8rem;font-weight:800;letter-spacing:.04em;transition:transform .25s ease}.not-found__link:hover{transform:scale(1.05)}.not-found__link span{font-weight:500}.not-found__art{position:relative;justify-self:end;width:min(26vw,23rem);aspect-ratio:1;background:#f3f3f0;border-radius:50% 50% 12% 50%;overflow:hidden}.not-found__art:before,.not-found__art:after,.not-found__art span,.not-found__art i{content:"";position:absolute;display:block;border:1px solid #111;border-radius:50%}.not-found__art:before{width:76%;height:76%;left:12%;top:12%;border-width:clamp(1px,.14vw,2px)}.not-found__art:after{width:32%;height:32%;right:-6%;top:19%}.not-found__art span{width:20%;height:20%;left:29%;top:34%;background:#fff}.not-found__art i{width:13%;height:13%;right:29%;bottom:25%;background:#fff}@media(max-width:47.9375rem){.not-found{grid-template-columns:1fr;gap:var(--space-8);padding-top:calc(var(--space-9) + var(--site-header-height))!important}.not-found__art{justify-self:start;width:min(58vw,17rem)}.not-found__links{gap:var(--space-5)}}
+.donut-sequence{margin:var(--space-8) 0!important;padding:0!important}.donut-sequence__stage{position:relative;height:100vh;min-height:700px;overflow:hidden;background:transparent;perspective:1400px}.donut-sequence canvas{display:block;width:100%;height:100%;pointer-events:none;transform:rotateY(var(--donut-tilt-y,0deg)) rotateX(var(--donut-tilt-x,0deg)) scale(1.012);transform-origin:center center;transition:transform .12s linear}.donut-sequence__loading{position:absolute;inset:0;display:grid;place-items:center;font-size:11px;font-weight:800;letter-spacing:.12em}.donut-sequence:not(.is-ready) canvas{opacity:0}@media(max-width:700px){.donut-sequence{margin:var(--space-6) 0!important}.donut-sequence__stage{height:min(68svh,620px);min-height:0}.donut-sequence canvas{transform:scale(1.006)}}
