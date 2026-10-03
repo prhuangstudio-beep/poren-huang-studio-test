@@ -4657,6 +4657,21 @@ body.home::before,body.home::after{display:none!important;content:none!important
   transform:rotateY(0)!important;
 }
 
+/* The detail image frame also clips its picture during the flip, so the
+   rounded edge remains visible on every material and aspect ratio. */
+.work-detail-page .work-main{
+  overflow:hidden!important;
+  border-radius:clamp(6px,.65vw,10px)!important;
+}
+.work-detail-page .work-main>picture,
+.work-detail-page .work-main img{
+  border-radius:inherit!important;
+}
+.work-detail-page .work-thumbnails button{
+  overflow:hidden;
+  border-radius:clamp(4px,.45vw,7px)!important;
+}
+
 /* Still images share the gallery's subtle softened edge.  Moving media stays square. */
 img{border-radius:clamp(4px,.45vw,7px)}
 .horizontal-image-ticker img,
