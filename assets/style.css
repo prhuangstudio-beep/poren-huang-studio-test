@@ -4626,6 +4626,51 @@ body.home::before,body.home::after{display:none!important;content:none!important
 .work-detail-page .work-main picture,
 .work-detail-page .work-main img{transform:none!important;transition:opacity .22s ease!important}
 
+/* Detail views: thumbnail, wheel and swipe changes use a restrained card flip. */
+.work-detail-page .work-main{
+  perspective:1200px;
+  transform-style:preserve-3d;
+}
+.work-detail-page .work-main>picture{
+  position:relative;
+  display:block;
+  width:100%;
+  height:100%;
+  backface-visibility:hidden;
+  transform-style:preserve-3d;
+  transform-origin:center;
+}
+.work-detail-page .work-main>picture.work-main__next{
+  position:absolute;
+  inset:0;
+  opacity:0!important;
+  transform:rotateY(86deg)!important;
+  transition:transform .38s cubic-bezier(.22,1,.36,1),opacity .16s ease!important;
+}
+.work-detail-page .work-main.is-flipping-out>picture:not(.work-main__next){
+  opacity:0!important;
+  transform:rotateY(-86deg)!important;
+  transition:transform .32s cubic-bezier(.55,0,1,.45),opacity .14s ease!important;
+}
+.work-detail-page .work-main.is-flipping-in>picture.work-main__next{
+  opacity:1!important;
+  transform:rotateY(0)!important;
+}
+
+/* Still images share the gallery's subtle softened edge.  Moving media stays square. */
+img{border-radius:clamp(4px,.45vw,7px)}
+.horizontal-image-ticker img,
+.horizontal-image-ticker picture,
+.artist-gallery-ticker img,
+.artist-gallery-ticker picture,
+.artist-side-gallery img,
+.image-carousel img,
+.image-carousel picture,
+.intro-screen__walker-image,
+.scroll-walker img,
+video,
+canvas{border-radius:0!important}
+
 /* Artist navigation sits closer to the panel it controls. */
 .about-page .artist-switch{margin-bottom:var(--space-2)!important}
 

@@ -32,19 +32,22 @@
     const replacement=nextPicture.cloneNode(true);
     const replacementImage=replacement.querySelector('img');
     replacementImage.loading='eager';
-    replacement.style.cssText='position:absolute;inset:0;display:block;opacity:0;transition:opacity 220ms ease';
+    replacement.classList.add('work-main__next');
     const reveal=()=>{
       requestAnimationFrame(()=>{
-        replacement.style.opacity='1';
-        if(currentPicture)currentPicture.style.opacity='0';
+        // Keep both faces in the same card while they rotate.  This avoids a
+        // blank frame when a high-resolution replacement is decoded.
+        mainFigure.classList.add('is-flipping-out');
+        requestAnimationFrame(()=>mainFigure.classList.add('is-flipping-in'));
         setTimeout(()=>{
           mainFigure.replaceChildren(replacement);
-          replacement.style.cssText='';
+          replacement.classList.remove('work-main__next');
+          mainFigure.classList.remove('is-flipping-out','is-flipping-in');
           main=replacement.querySelector('img');
           thumbnails.forEach(item=>item.classList.toggle('active',item===button));
           button.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
           switchingImage=false;
-        },230);
+        },420);
       });
     };
     mainFigure.append(replacement);
