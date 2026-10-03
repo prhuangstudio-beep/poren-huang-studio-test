@@ -38,7 +38,7 @@ body.donut-transition-leaving{
 }
 
 .donut-page-transition video{
-  width:clamp(180px,30vw,360px);
+  width:clamp(120px,18vw,230px);
   height:auto;
   display:block;
   object-fit:contain;
@@ -46,7 +46,7 @@ body.donut-transition-leaving{
 
 @media(max-width:700px){
   .donut-page-transition video{
-    width:clamp(150px,48vw,280px);
+    width:clamp(108px,34vw,180px);
   }
 }
 

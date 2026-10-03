@@ -23,14 +23,6 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npm run build
-      - name: Set test-site asset paths
-        if: github.repository == 'prhuangstudio-beep/poren-huang-studio-test'
-        run: |
-          find . -name '*.html' -not -path './node_modules/*' -print0 | xargs -0 sed -i \
-            -e 's|<base href="/">|<base href="/poren-huang-studio-test/">|g' \
-            -e 's|<base href="../">|<base href="/poren-huang-studio-test/">|g' \
-            -e 's|href="/#contact"|href="/poren-huang-studio-test/#contact"|g' \
-            -e 's|href="/"|href="/poren-huang-studio-test/"|g'
       - name: Commit generated pages
         run: |
           git config user.name "github-actions[bot]"

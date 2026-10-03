@@ -62,7 +62,7 @@
     const currentIndex=()=>Math.max(0,thumbnails.findIndex(button=>button.classList.contains('active')));
     const resetCard=()=>{
       const picture=mainFigure.querySelector('picture');
-      if(picture){picture.style.transform='';picture.style.transition='transform 260ms cubic-bezier(.22,1,.36,1)'}
+      if(picture){picture.style.transform='none';picture.style.transition='none'}
     };
     mainFigure.addEventListener('pointerdown',event=>{
       if(event.pointerType==='mouse')return;
@@ -74,22 +74,17 @@
     mainFigure.addEventListener('pointermove',event=>{
       if(!dragging)return;
       deltaX=event.clientX-startX;
-      const picture=mainFigure.querySelector('picture');
-      if(picture){
-        picture.style.transition='none';
-        picture.style.transform=`translateX(${Math.max(-32,Math.min(32,deltaX*.22))}px)`;
-      }
+      // The chosen image stays at its natural scale while swiping; only the
+      // selected thumbnail changes after the gesture completes.
     });
     const finishSwipe=()=>{
       if(!dragging)return;
       dragging=false;
       resetCard();
-      if(Math.abs(deltaX)<34)return;
+      if(Math.abs(deltaX)<48)return;
       const direction=deltaX<0?1:-1;
       const next=(currentIndex()+direction+thumbnails.length)%thumbnails.length;
-      thumbnails.forEach((button,index)=>button.classList.toggle('active',index===next));
-      thumbnails[next].scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
-      window.setTimeout(()=>showImage(next),90);
+      showImage(next);
     };
     mainFigure.addEventListener('pointerup',finishSwipe);
     mainFigure.addEventListener('pointercancel',finishSwipe);

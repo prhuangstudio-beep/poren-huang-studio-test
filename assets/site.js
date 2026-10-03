@@ -1,4 +1,17 @@
 if('scrollRestoration' in history)history.scrollRestoration='manual';
+// The lightweight local test server serves physical HTML files and has no
+// extensionless-route rewrite. Normalise only its internal section links so
+// every test-site page remains reachable by clicking the site navigation.
+if(location.hostname==='127.0.0.1'){
+  const testPages=new Set(['about','works','exhibitions','press','series','work']);
+  document.querySelectorAll('a[href]').forEach(link=>{
+    const target=new URL(link.getAttribute('href'),location.href);
+    const pageName=target.pathname.replace(/^\/+|\/+$/g,'');
+    if(target.origin===location.origin&&testPages.has(pageName)){
+      link.href=`${target.pathname}.html${target.search}${target.hash}`;
+    }
+  });
+}
 window.addEventListener('pageshow',()=>{
   document.body.classList.remove('page-entering','page-leaving');
   document.querySelectorAll('#year').forEach(x=>x.textContent=new Date().getFullYear());
@@ -22,9 +35,7 @@ if(matchMedia('(pointer:fine)').matches){
   };
   window.addEventListener('onpointerrawupdate'in window?'pointerrawupdate':'pointermove',moveCursor,{passive:true});
   document.addEventListener('mouseover',e=>{
-    const homeWorks=!!e.target.closest('body.home #works');
-    cursor.classList.toggle('is-suppressed',homeWorks);
-    cursor.classList.toggle('is-active',!homeWorks&&!!e.target.closest('a,button,.work-stage'));
+    cursor.classList.toggle('is-active',!!e.target.closest('a,button,[role="button"],input,select,textarea,.work-stage,.news article'));
   });
 }
 
@@ -166,52 +177,141 @@ if(hero){
   document.body.classList.add('home');
   document.body.classList.add('intro-active');
   const heroVideo=document.querySelector('.video-banner__foreground');
-  const ambientVideo=document.querySelector('.video-banner__ambient');
-  let ambientStarted=false;
+  const artistFilmVideo=document.querySelector('.artist-film__foreground');
+  const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
   let introCleared=false;
-  const loadAmbientVideo=()=>{
-    if(ambientStarted||!ambientVideo||!matchMedia('(min-width: 901px)').matches)return;
-    ambientStarted=true;
-    ambientVideo.setAttribute('src',ambientVideo.dataset.hdSrc);
-    ambientVideo.load();
-    ambientVideo.addEventListener('loadeddata',()=>document.body.classList.add('hero-ambient-ready'),{once:true});
-    ambientVideo.play().catch(()=>{});
+  let artistFilmVisible=false;
+  const prepareArtistFilm=()=>{
+    if(!artistFilmVideo||reducedMotion||artistFilmVideo.dataset.loaded)return;
+    const source=document.createElement('source');
+    source.src=matchMedia('(max-width: 900px)').matches?artistFilmVideo.dataset.mobileSrc:artistFilmVideo.dataset.desktopSrc;
+    source.type='video/mp4';
+    artistFilmVideo.append(source);
+    artistFilmVideo.dataset.loaded='true';
+    artistFilmVideo.preload='auto';
+    artistFilmVideo.muted=true;
+    artistFilmVideo.playsInline=true;
+    artistFilmVideo.load();
   };
+  artistFilmVideo?.addEventListener('canplaythrough',()=>{
+    document.body.dataset.artistFilmReady='true';
+    window.dispatchEvent(new Event('poren:artist-film-ready'));
+  },{once:true});
   const warmHeroVideo=()=>{
-    if(!heroVideo)return;
+    if(!heroVideo||reducedMotion)return;
+    document.body.dataset.heroMediaStarted='true';
+    window.dispatchEvent(new Event('poren:hero-media-start'));
     heroVideo.preload='auto';
     heroVideo.muted=true;
     heroVideo.autoplay=true;
     heroVideo.playsInline=true;
+    if(!heroVideo.dataset.loaded){heroVideo.dataset.loaded='true';heroVideo.load();}
     heroVideo.play().catch(()=>{});
+    // Download with the first film; playback remains visibility-gated below.
+    prepareArtistFilm();
   };
-  warmHeroVideo();
-  heroVideo?.addEventListener('loadeddata',warmHeroVideo,{once:true});
-  // The ambient layer is decorative. Let the primary film, artwork images and
-  // artist film establish first; only then download this duplicate desktop stream.
-  heroVideo?.addEventListener('canplay',()=>setTimeout(()=>{if(introCleared)loadAmbientVideo();},12000),{once:true});
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)warmHeroVideo();});
+  // Keep the opening route as the first network priority. The large hero film
+  // starts only after the overlay has finished, when it can actually be seen.
+  heroVideo?.removeAttribute('autoplay');
+  if(heroVideo)heroVideo.preload='metadata';
+  // The Artist film shares the first-film download window, while playback
+  // remains gated by visibility so it does not compete for rendering work.
+  artistFilmVideo?.removeAttribute('autoplay');
+  if(artistFilmVideo)artistFilmVideo.preload='none';
+  const warmArtistFilm=()=>{
+    if(!artistFilmVideo||reducedMotion)return;
+    prepareArtistFilm();
+    if(!introCleared||!artistFilmVisible)return;
+    artistFilmVideo.play().catch(()=>{});
+  };
+  if(artistFilmVideo&&'IntersectionObserver' in window){
+    const artistFilmObserver=new IntersectionObserver(entries=>entries.forEach(entry=>{
+      artistFilmVisible=entry.isIntersecting;
+      if(artistFilmVisible)warmArtistFilm();
+      else artistFilmVideo.pause();
+    }),{rootMargin:'320px 0px'});
+    artistFilmObserver.observe(artistFilmVideo);
+  }else setTimeout(warmArtistFilm,4000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&introCleared){warmHeroVideo();if(artistFilmVisible)warmArtistFilm();}else artistFilmVideo?.pause();});
   window.scrollTo(0,0);
   const intro=document.createElement('div');
   intro.className='intro-screen';
-  intro.innerHTML='<span>POREN HUANG<small>SCULPTURE</small></span>';
+  // Keep the originally approved walking source: its pose, scale and cadence
+  // define the opening animation. The large page films are deferred instead.
+  intro.innerHTML='<div class="intro-screen__walker" aria-hidden="true"><img class="intro-screen__walker-canvas intro-screen__walker-image" src="assets/media/intro-character-continuous-alpha.webp" alt=""></div><span><strong class="intro-word">POREN</strong><em class="intro-gap" aria-hidden="true">&nbsp;</em><strong class="intro-word">HUANG</strong><small>SCULPTURE</small></span>';
   document.body.prepend(intro);
+  const introWalkImage=intro.querySelector('.intro-screen__walker-image');
+  // The approved alpha animation is used on every screen: it preserves the
+  // black outline and avoids browser-side green-screen processing.
+  const useMobileIntroImage=true;
+  let introExitTimer=0,introFallbackTimer=0;
+  const fadeIntroToHome=()=>{
+    if(intro.dataset.fading)return;
+    intro.dataset.fading='true';
+    document.body.classList.remove('intro-home-hidden');
+    intro.classList.add('is-revealing');
+    // White field, lettering and character share one final 0.6 s fade.
+    intro.classList.add('is-final');
+    setTimeout(clearIntro,600);
+  };
+  const beginIntroExit=()=>{
+    // Start preparing the hero one second into the opening, then reveal it
+    // behind the uninterrupted walk. The fade never exposes a blank frame.
+    if(heroVideo&&heroVideo.readyState>=3&&!heroVideo.paused){fadeIntroToHome();return;}
+    heroVideo?.addEventListener('playing',fadeIntroToHome,{once:true});
+    warmHeroVideo();
+  };
+  const beginIntroWalk=()=>{
+    if(intro.classList.contains('is-walking'))return;
+    clearTimeout(introFallbackTimer);
+    intro.classList.add('is-walking');
+    clearTimeout(introExitTimer);
+    // The uninterrupted three-second walk ends in one shared 0.6 s fade.
+    introExitTimer=setTimeout(beginIntroExit,3000);
+  };
+  document.body.classList.add('intro-home-hidden');
+  setTimeout(warmHeroVideo,1000);
+  if(useMobileIntroImage){
+    // Animated WebP retains alpha on mobile browsers that flatten WebM alpha.
+    // Begin the shared timeline only after the first transparent frame is ready.
+    const beginWhenDecoded=()=>{const decoded=introWalkImage.decode?.();if(decoded?.then)decoded.catch(()=>{}).finally(beginIntroWalk);else beginIntroWalk();};
+    if(introWalkImage.complete&&introWalkImage.naturalWidth)beginWhenDecoded();
+    else introWalkImage.addEventListener('load',beginWhenDecoded,{once:true});
+    introFallbackTimer=setTimeout(beginIntroWalk,8000);
+  }
   document.documentElement.classList.remove('home-preintro');
+  const alignIntroWalker=()=>{
+    const gap=intro.querySelector('.intro-gap');
+    const canvas=introWalkImage;
+    if(!gap||!canvas)return;
+    const rect=gap.getBoundingClientRect();
+    canvas.style.left=`${rect.left+(rect.width/2)}px`;
+  };
+  const realignIntro=()=>{alignIntroWalker();};
+  requestAnimationFrame(()=>requestAnimationFrame(realignIntro));
+  setTimeout(realignIntro,120);
+  window.addEventListener('resize',realignIntro);
+  document.fonts?.ready?.then(alignIntroWalker);
   const clearIntro=()=>{
     if(introCleared)return;
     introCleared=true;
+    window.removeEventListener('resize',realignIntro);
+    clearTimeout(introExitTimer);
+    clearTimeout(introFallbackTimer);
     window.scrollTo(0,0);
     document.body.classList.remove('intro-active');
     intro.remove();
+    window.dispatchEvent(new Event('poren:intro-complete'));
     warmHeroVideo();
-    setTimeout(loadAmbientVideo,12000);
+    if(artistFilmVisible)warmArtistFilm();
   };
   intro.addEventListener('animationend',e=>{
     if(e.animationName==='intro-out'){
       clearIntro();
     }
   });
-  setTimeout(clearIntro,4200);
+  // Both desktop and mobile are driven only by beginIntroWalk: lettering and
+  // character share one fixed 3.0 s walk plus 0.6 s fade timeline.
   const homeNav=document.createElement('div');
   homeNav.className='home-section-nav';
   homeNav.setAttribute('role','navigation');
@@ -230,6 +330,7 @@ if(hero){
   homeNavLinks.forEach(link=>{
     link.addEventListener('click',event=>{
       const selector=link.getAttribute('href');
+      window.dispatchEvent(new CustomEvent('poren:section-select',{detail:{selector}}));
       if(selector==='#top'){
         event.preventDefault();
         window.scrollTo({top:0,behavior:'smooth'});
@@ -252,6 +353,7 @@ if(hero){
       return top<=innerHeight*.42?item:active;
     },homeSections[0]);
     homeNavLinks.forEach(link=>link.classList.toggle('active',link===current.link));
+    document.body.dataset.homeSection=current.link.getAttribute('href')||'#top';
   };
   updateHomeNav();
   addEventListener('scroll',updateHomeNav,{passive:true});
@@ -262,13 +364,18 @@ if(page){
   if(location.pathname.includes('about'))page.dataset.label='';
   else if(location.pathname.includes('works'))page.dataset.label='WORKS';
   else page.dataset.label='';
-  if(!page.querySelector('.page-back,.back-to-works')){
+  const existingBack=page.querySelector('.page-back,.back-to-works');
+  if(existingBack){
+    existingBack.className='page-back key-back';
+    existingBack.setAttribute('aria-label','Back');
+    existingBack.innerHTML='<img class="back-key-image" src="/assets/media/ui/back-dog-bowl.png" alt="">';
+    page.classList.add('has-page-back');
+  }else{
     const back=document.createElement('a');
     back.className='page-back key-back';
-    const siteRoot=location.hostname==='prhuangstudio-beep.github.io'&&location.pathname.startsWith('/poren-huang-studio-test/')?'/poren-huang-studio-test/':'/';
-    back.href=location.pathname.includes('/works/')?'../works':siteRoot;
+    back.href=location.pathname.includes('/works/')?'../works':'/';
     back.setAttribute('aria-label','Back');
-    back.innerHTML='<img class="back-key-image" src="assets/media/back-key-black.png" alt="">';
+    back.innerHTML='<img class="back-key-image" src="/assets/media/ui/back-dog-bowl.png" alt="">';
     page.prepend(back);
     page.classList.add('has-page-back');
   }
@@ -323,7 +430,9 @@ if(form){
 }
 
 const stage=document.querySelector('.work-stage');
-if(stage){
+// On the homepage this is replaced by the dedicated continuously moving
+// ticker below. Detect it from the hero itself: body.home is assigned later.
+if(stage&&!document.querySelector('.hero')){
   const section=stage.closest('.side-section'),head=section.querySelector('.section-head'),allLink=head?.querySelector('a');
   section.classList.add('works-section');
   if(allLink){
@@ -448,24 +557,10 @@ if(artistSwitch){
 const cv=document.querySelector('.artist-cv');
 if(cv){
   const articles=[...cv.querySelectorAll('article')];
-  if(articles.length>8){
-    cv.classList.add('is-collapsed');
-    articles.slice(8).forEach(article=>article.hidden=true);
-    const button=document.createElement('button');
-    button.className='cv-toggle';
-    button.type='button';
-    button.textContent='View full timeline →';
-    cv.append(button);
-    button.addEventListener('click',()=>{
-      const collapsed=cv.classList.toggle('is-collapsed');
-      articles.slice(8).forEach(article=>article.hidden=collapsed);
-      button.textContent=collapsed?'View full timeline →':'Hide full timeline ↑';
-    });
-  }
+  articles.forEach(article=>article.hidden=false);
+  cv.classList.remove('is-collapsed');
+  cv.querySelector('.cv-toggle')?.remove();
 }
-
-const labels=['ARTIST','WORKS','NEWS','PRESS'];
-document.querySelectorAll('.side-title span').forEach((label,i)=>label.textContent=labels[i]||label.textContent);
 
 const footerSocialLinks='<a href="https://www.instagram.com/porenhuang" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><span class="social-label">IG</span></a><a href="https://www.facebook.com/share/1bvSVWuj5K/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><span class="social-label">f</span></a><a href="https://youtube.com/@porenhuang" target="_blank" rel="noopener noreferrer" aria-label="YouTube"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="m10 9 5 3-5 3z"/></svg></a><a href="https://mail.google.com/mail/?view=cm&fs=1&to=pr_dogs@yahoo.com.tw" target="_blank" rel="noopener noreferrer" aria-label="Email"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="m4 7 8 6 8-6"/></svg></a><a href="https://www.threads.com/@porenhuang" target="_blank" rel="noopener noreferrer" aria-label="Threads"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c-5 0-8 3.2-8 8.3 0 5.3 3 8.7 7.9 8.7 4 0 6.6-2.5 6.6-6 0-3.2-2.1-5.3-5.2-5.3-2.8 0-4.7 1.6-4.7 4 0 2 1.3 3.3 3.2 3.3 1.7 0 2.8-1 2.8-2.6 0-1.8-1.5-3-3.8-3"/></svg></a>';
 const footer=document.querySelector('footer');
@@ -480,12 +575,108 @@ if(footer){
   if(!footer.querySelector('.contact-me')){
     socials.insertAdjacentHTML('afterend','<a class="contact-me" href="https://mail.google.com/mail/?view=cm&fs=1&to=pr_dogs@yahoo.com.tw" target="_blank" rel="noopener noreferrer" aria-label="Contact Poren Huang by Gmail">CONTACT ME</a>');
   }
+  if(!footer.querySelector('.contact-details')){
+    footer.querySelector('small')?.insertAdjacentHTML('beforebegin','<address class="contact-details"><a href="mailto:pr_dogs@yahoo.com.tw">pr_dogs@yahoo.com.tw</a><a href="tel:+886926776431">+886 926 776 431</a><span>台中市大甲區甲埔大道800號<br>No. 800, Jiapu Blvd., Dajia Dist., Taichung City 437, Taiwan</span></address>');
+  }
 }
 if(footer&&hero){
-  footer.insertAdjacentHTML('afterbegin','<p class="contact-title">CONTACT</p>');
-  footer.querySelector('small').insertAdjacentHTML('beforebegin','<address class="contact-details"><a href="mailto:pr_dogs@yahoo.com.tw">pr_dogs@yahoo.com.tw</a><a href="tel:+886926776431">+886 926 776 431</a><span>台中市大甲區甲埔大道800號<br>No. 800, Jiapu Blvd., Dajia Dist., Taichung City 437, Taiwan</span></address>');
-  footer.insertAdjacentHTML('afterend','<div class="end-spacer" aria-hidden="true"></div>');
+  if(!footer.querySelector('.contact-title')){
+    footer.insertAdjacentHTML('afterbegin','<p class="contact-title">CONTACT</p>');
+  }
+  if(!document.querySelector('.end-spacer')){
+    footer.insertAdjacentHTML('afterend','<div class="end-spacer" aria-hidden="true"></div>');
+  }
 }
+if(footer&&document.body.classList.contains('home')){
+  const contactTitle=footer.querySelector('a.contact-title');
+  if(contactTitle){
+    const label=document.createElement('p');
+    label.className=contactTitle.className;
+    label.textContent=contactTitle.textContent;
+    contactTitle.replaceWith(label);
+  }
+}
+
+// Every "view more..." keeps its established base colour. Its only hover
+// response is a compact scale, so it behaves consistently across sections.
+document.querySelectorAll('a').forEach(link=>{
+  if(!/^view more(?:…|\.\.\.)?$/i.test(link.textContent.trim()))return;
+  link.style.setProperty('--view-more-base-color',getComputedStyle(link).color);
+  link.classList.add('view-more-link');
+});
+
+// Replace every final "view more" label with the mirrored key artwork after
+// page-specific links have finished moving into their final containers.
+const initialiseViewMoreKeys=()=>{
+  document.querySelectorAll('a').forEach(link=>{
+    if(link.classList.contains('key-view-more'))return;
+    if(!/^view more(?:…|\.\.\.)?$/i.test(link.textContent.trim()))return;
+    link.classList.add('view-more-link','key-view-more');
+    link.setAttribute('aria-label','View more');
+    const image=document.createElement('img');
+    image.className='view-more-key-image';
+    image.src='/assets/media/ui/view-more-key-mirrored.png';
+    image.alt='';
+    link.replaceChildren(image);
+    const setGoldState=showGold=>{
+      if(showGold===link.classList.contains('is-gold'))return;
+      link.classList.remove('is-gold','is-gold-out');
+      // Force a fresh animation when the pointer reverses direction quickly.
+      void link.offsetWidth;
+      link.classList.add(showGold?'is-gold':'is-gold-out');
+    };
+    const revealGold=()=>setGoldState(true);
+    const concealGold=()=>setGoldState(false);
+    link.addEventListener('pointerenter',revealGold);
+    link.addEventListener('pointerleave',concealGold);
+    link.addEventListener('focus',revealGold);
+    link.addEventListener('blur',concealGold);
+    link.addEventListener('animationend',event=>{
+      if(event.animationName==='view-more-key-gold-out')link.classList.remove('is-gold-out');
+    });
+  });
+};
+queueMicrotask(initialiseViewMoreKeys);
+
+const artistGalleryImages=['IMG_2117.JPG','IMG_8234.JPG','IMG_9063.JPG','IMG_9066.JPG','IMG_9119.JPG','IMG_9123.JPG','L1000258.JPG','L1020065.JPG','L1020266.JPG','L1020295.JPG','L1020311.JPG','L1020519.JPG','L1020532.JPG','L1020536.JPG','L1020548.JPG','L1020604.JPG','L1020747.JPG','L1020834.JPG','L1020850.JPG','L1020890.JPG','L1030503.JPG','L1120738.JPG','L1120742.JPG','L1120749.JPG','直微發光.png'];
+document.querySelectorAll('[data-artist-gallery]').forEach(gallery=>{
+  const files=gallery.dataset.galleryOrder==='reverse'?[...artistGalleryImages].reverse():artistGalleryImages;
+  const track=document.createElement('div');
+  track.className='artist-gallery-ticker__track';
+  const figures=files.map((filename,index)=>{
+    const figure=document.createElement('figure');
+    const image=document.createElement('img');
+    image.loading='lazy';
+    image.src=`assets/media/artist-gallery/optimized/${encodeURIComponent(filename.replace(/\.[^.]+$/,'')+'.webp')}`;
+    image.alt=`雕塑藝術家黃柏仁 Poren Huang 照片 ${index+1}`;
+    figure.append(image);
+    return figure;
+  });
+  const repeats=figures.map(figure=>{
+    const copy=figure.cloneNode(true);
+    copy.setAttribute('aria-hidden','true');
+    copy.querySelector('img').alt='';
+    return copy;
+  });
+  track.append(...figures,...repeats);
+  gallery.classList.add('artist-gallery-ticker');
+  gallery.replaceChildren(track);
+  const contentColumn=gallery.closest('.press-page-layout')?.querySelector('.press-list')||gallery.closest('.artist-cv-layout')?.querySelector('.artist-cv');
+  const measureViewport=()=>{
+    if(!contentColumn)return;
+    gallery.style.setProperty('--artist-gallery-view-height',`${Math.ceil(contentColumn.getBoundingClientRect().height)}px`);
+  };
+  const measureCycle=()=>{
+    const firstRepeat=repeats[0];
+    if(firstRepeat)track.style.setProperty('--artist-gallery-cycle',`-${Math.round(firstRepeat.offsetTop)}px`);
+  };
+  track.querySelectorAll('img').forEach(image=>image.addEventListener('load',measureCycle,{once:true}));
+  new ResizeObserver(measureCycle).observe(track);
+  if(contentColumn)new ResizeObserver(measureViewport).observe(contentColumn);
+  window.addEventListener('resize',measureViewport,{passive:true});
+  measureCycle();
+  measureViewport();
+});
 
 document.querySelectorAll('.work-detail-info .work-heading h1').forEach(title=>{
   if(title.querySelector('.work-title-en'))return;
@@ -550,79 +741,224 @@ if('IntersectionObserver'in window){
   revealItems.forEach(item=>observer.observe(item));
 }else revealItems.forEach(item=>item.classList.add('is-visible'));
 
-const homeStage=document.querySelector('.work-stage');
-if(homeStage){
-  const enableHomeCoverRotation=true;
-  if(!document.querySelector('.work-swipe-hint'))homeStage.insertAdjacentHTML('afterend','<span class="work-swipe-hint" aria-hidden="true"><svg viewBox="0 0 32 16"><path d="M7 3 2 8l5 5M2 8h28M25 3l5 5-5 5"/></svg></span>');
-  const homeCovers={
-    'Power Food':['assets/catalog/power-food/01.jpg?v=20260902pf','assets/catalog/power-food/03-home.jpg?v=20260902pfh'],
-    'Super Power':['assets/catalog/super-power-lake-green/01.jpg?v=20260902','assets/catalog/super-power-neon-orange/01.jpg?v=20260902','assets/catalog/super-power-stainless-steel/01.jpg?v=20260902'],
-    'Speedy':['assets/catalog/speedy-black/01.jpg?v=20260902','assets/catalog/speedy-gold-leaf/01.jpg?v=20260902','assets/catalog/speedy-stainless-steel/01.jpg?v=20260902'],
-    'Shake Shake':['assets/catalog/shake-shake-black/01.jpg?v=20260902','assets/catalog/shake-shake-lake-green/01.jpg?v=20260902','assets/catalog/shake-shake-stainless-steel/01.jpg?v=20260902'],
-    'Bubble':['assets/catalog/bubble-black-pink/01.jpg?v=20260902','assets/catalog/bubble-green/01.jpg?v=20260902','assets/catalog/bubble-pink/01.jpg?v=20260902']
-  };
-  const sizeHomeWorks=()=>homeStage.querySelectorAll('.home-work-image').forEach(image=>{
-    const panel=image.closest('.work-panel');
-    if(image.naturalWidth&&image.naturalHeight&&panel)panel.style.setProperty('--panel-width',(panel.clientHeight*image.naturalWidth/image.naturalHeight)+'px');
+const homeStage=document.querySelector('body.home .work-stage');
+const homeSeries=document.querySelector('body.home #series .series-entry');
+const homeImageTicker=document.querySelector('body.home .horizontal-image-ticker__track');
+if(document.body.classList.contains('home')){
+  // The homepage is a concise preview: the full archive remains available on
+  // the News page, while this card never exceeds five readable entries.
+  document.querySelectorAll('body.home #news .side-content > article').forEach((article,index)=>{
+    article.hidden=index>=5;
   });
-  let resizeFrame=0;
-  const queueHomeWorkSizing=()=>{
-    if(resizeFrame)return;
-    resizeFrame=requestAnimationFrame(()=>{
-      resizeFrame=0;
-      sizeHomeWorks();
-    });
-  };
-  if(enableHomeCoverRotation)homeStage.querySelectorAll('.home-work-image').forEach(image=>{
-    if(homeCovers[image.alt])image.src=homeCovers[image.alt][0];
-    image.complete?sizeHomeWorks():image.addEventListener('load',sizeHomeWorks,{once:true});
-  });
-  homeStage.querySelectorAll('.home-work-image').forEach(image=>{
-    const covers=homeCovers[image.alt];
-    image.classList.add('active');
-    if(!covers||covers.length<2)return;
-    const clone=image.cloneNode();
-    clone.classList.remove('active');
-    clone.removeAttribute('src');
-    clone.setAttribute('aria-hidden','true');
-    image.after(clone);
-  });
-  const homeCoverIndexes={},homeActiveLayers={};
-  const rotateHomeCover=panel=>{
-    const activeImage=panel.querySelector('.home-work-image.active');
-    if(!activeImage)return;
-    const covers=homeCovers[activeImage.alt];
-    if(!covers||covers.length<2)return;
-    const layers=[...panel.querySelectorAll('.home-work-image')];
-    const inactiveImage=layers.find(image=>image!==activeImage);
-    if(!inactiveImage||homeActiveLayers[activeImage.alt])return;
-    homeCoverIndexes[activeImage.alt]=((homeCoverIndexes[activeImage.alt]||0)+1)%covers.length;
-    const nextSrc=covers[homeCoverIndexes[activeImage.alt]];
-    homeActiveLayers[activeImage.alt]=true;
-    let activated=false;
-    const activateNext=()=>{
-      if(activated)return;
-      activated=true;
-      requestAnimationFrame(()=>{
-        inactiveImage.classList.add('active');
-        activeImage.classList.remove('active');
-        homeActiveLayers[activeImage.alt]=false;
-      });
-    };
-    if(inactiveImage.getAttribute('src')===nextSrc){
-      activateNext();
-      return;
-    }
-    inactiveImage.onload=activateNext;
-    inactiveImage.src=nextSrc;
-    if(inactiveImage.complete)activateNext();
-  };
-  if(enableHomeCoverRotation)setInterval(()=>{
-    if(document.hidden)return;
-    homeStage.querySelectorAll('.work-panel').forEach(rotateHomeCover);
-  },5600);
-  window.addEventListener('resize',queueHomeWorkSizing,{passive:true});
 }
+if(document.body.classList.contains('home')){
+  // A long, coloured canvas: eight soft pools are distributed through the
+  // document height, while their colours shuffle at every page visit.
+  // One chromatic family only: lake green over white, with positions shuffled
+  // across the complete document rather than pinned to the viewport.
+  const pastel=['rgba(111,205,190,.52)','rgba(151,224,212,.46)','rgba(91,187,173,.38)','rgba(207,244,236,.66)'];
+  const colours=[...pastel,...pastel].sort(()=>Math.random()-.5);
+  colours.forEach((colour,index)=>{
+    const y=7+index*12+Math.random()*6;
+    document.body.style.setProperty(`--home-blob-${index+1}-position`,`${Math.round(8+Math.random()*84)}% ${Math.round(y)}%`);
+    document.body.style.setProperty(`--home-blob-${index+1}-colour`,colour);
+  });
+}
+if(homeImageTicker){
+  // The image strip uses the same base travel rate as the Works ticker
+  // (.34 px per 16 ms), but recalculates its loop duration per viewport.
+  const syncHomeImageTickerSpeed=()=>{
+    const pixelsPerSecond=.34/(16/1000);
+    homeImageTicker.style.setProperty('--home-image-ticker-duration',`${(innerWidth/pixelsPerSecond).toFixed(2)}s`);
+  };
+  syncHomeImageTickerSpeed();
+  addEventListener('resize',syncHomeImageTickerSpeed);
+}
+// Infinite image strips need no compositor time while entirely off screen.
+if('IntersectionObserver'in window){
+  const animatedStripObserver=new IntersectionObserver(entries=>entries.forEach(entry=>{
+    entry.target.classList.toggle('is-offscreen',!entry.isIntersecting);
+  }),{threshold:0});
+  document.querySelectorAll('.horizontal-image-ticker,.artist-gallery-ticker').forEach(strip=>animatedStripObserver.observe(strip));
+}
+if(homeSeries){
+  homeSeries.classList.remove('view-more-link');
+  const seriesMore=homeSeries.closest('.side-content')?.querySelector('.series-more');
+  if(!seriesMore){
+    const link=document.createElement('a');
+    link.className='series-more view-more-link';
+    link.href=homeSeries.getAttribute('href')||'series';
+    link.textContent='view more...';
+    homeSeries.querySelector('span')?.remove();
+    homeSeries.insertAdjacentElement('afterend',link);
+  }
+}
+// Series adds its control after the first key pass; run the idempotent pass
+// once more so it receives the same mirrored key and hover behaviour.
+queueMicrotask(initialiseViewMoreKeys);
+if(homeStage){
+  document.querySelectorAll('.work-swipe-hint,.more-panel').forEach(item=>item.remove());
+  const worksContent=homeStage.closest('.side-content');
+  const worksHead=worksContent?.querySelector('.section-head');
+  const worksMore=worksHead?.querySelector('a[href]');
+  if(worksMore){
+    worksMore.classList.add('works-more');
+    homeStage.insertAdjacentElement('afterend',worksMore);
+  }
+  worksHead?.remove();
+  const homeWorksUrl='data/works.json';
+  const escapeHtml=value=>String(value).replace(/[&<>'"]/g,character=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
+  const startHomeWorksTicker=works=>{
+    const groups=new Map();
+    works.slice().sort((a,b)=>Number(b.year)-Number(a.year)||String(a.title_en).localeCompare(String(b.title_en))).forEach(work=>{
+      const key=[work.year,work.title_en,work.title_zh||''].join('|');
+      if(!groups.has(key))groups.set(key,{key,year:work.year,title:work.title_en,variants:[]});
+      const image=work.images?.[0];
+      if(image)groups.get(key).variants.push({src:image.filename,alt:image.alt_zh||image.alt_en||work.title_en,href:'works/'+work.id+'.html'});
+    });
+    const recent=[...groups.values()].filter(group=>group.variants.length).slice(0,15);
+    if(!recent.length)return;
+    const card=group=>{
+      const first=group.variants[0];
+      return '<a class="work-panel home-ticker-card" href="'+escapeHtml(first.href)+'" data-home-work="'+escapeHtml(group.key)+'" data-variants="'+escapeHtml(JSON.stringify(group.variants))+'"><img loading="lazy" class="home-work-image active" src="'+escapeHtml(first.src)+'" alt="'+escapeHtml(first.alt)+'"><span>'+escapeHtml(group.title)+'<small>'+escapeHtml(group.year)+'</small></span></a>';
+    };
+    homeStage.innerHTML=recent.map(card).join('')+recent.map(card).join('');
+    homeStage.classList.add('works-ticker-ready');
+    const panels=[...homeStage.querySelectorAll('.home-ticker-card')];
+    let velocity=0,scrollPosition=0,dragging=false,startX=0,startScroll=0,moved=false,pressedPanel=null;
+    const loopWidth=()=>homeStage.scrollWidth/2;
+    const keepLooped=()=>{
+      const cycle=loopWidth();
+      if(!cycle)return;
+      if(scrollPosition>=cycle)scrollPosition-=cycle;
+      if(scrollPosition<0)scrollPosition+=cycle;
+      homeStage.scrollLeft=scrollPosition;
+    };
+    let tickerVisible=false,tickerFrame=0,lastTickerTime=0,coverTimer=0;
+    const tick=time=>{
+      tickerFrame=0;
+      if(!tickerVisible||dragging||document.hidden||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+      const steps=Math.min(4,Math.max(.25,(time-lastTickerTime)/16.667));
+      lastTickerTime=time;
+      // scrollLeft stores integer pixels; retain the fractional distance here
+      // so the slow continuous movement does not get rounded back to zero.
+      scrollPosition+=.34*steps+velocity;
+      velocity*=Math.pow(.92,steps);
+      if(Math.abs(velocity)<.01)velocity=0;
+      keepLooped();
+      tickerFrame=requestAnimationFrame(tick);
+    };
+    const startTicker=()=>{
+      if(!tickerVisible||tickerFrame||document.hidden||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+      lastTickerTime=performance.now();
+      tickerFrame=requestAnimationFrame(tick);
+    };
+    homeStage.addEventListener('wheel',event=>{
+      const movement=Math.abs(event.deltaX)>Math.abs(event.deltaY)?event.deltaX:event.deltaY;
+      if(!movement)return;
+      event.preventDefault();
+      velocity=Math.max(-48,Math.min(48,velocity+movement*.18));
+    },{passive:false});
+    homeStage.addEventListener('pointerdown',event=>{
+      dragging=true;moved=false;velocity=0;startX=event.clientX;startScroll=scrollPosition;
+      pressedPanel=event.target.closest('.home-ticker-card');
+      homeStage.setPointerCapture?.(event.pointerId);
+    });
+    homeStage.addEventListener('pointermove',event=>{
+      if(!dragging)return;
+      const delta=event.clientX-startX;
+      if(Math.abs(delta)>5)moved=true;
+      scrollPosition=startScroll-delta;
+      keepLooped();
+    });
+    const release=event=>{
+      if(!dragging)return;
+      const delta=event.clientX-startX;
+      if(Math.abs(delta)>5)velocity=Math.max(-26,Math.min(26,-delta*.12));
+      dragging=false;
+      try{homeStage.releasePointerCapture?.(event.pointerId)}catch{}
+      if(!moved&&pressedPanel?.href){
+        event.preventDefault();
+        location.href=pressedPanel.href;
+        return;
+      }
+      pressedPanel=null;
+      if(moved)setTimeout(()=>moved=false,0);
+    };
+    homeStage.addEventListener('pointerup',release);
+    homeStage.addEventListener('pointercancel',release);
+    panels.forEach(panel=>panel.addEventListener('click',event=>{if(moved)event.preventDefault();}));
+    const panelsByWork=new Map();
+    panels.forEach(panel=>{
+      const key=panel.dataset.homeWork;
+      if(!panelsByWork.has(key))panelsByWork.set(key,[]);
+      panelsByWork.get(key).push(panel);
+    });
+    const coverIndexes=new Map();
+    const changeCover=(panel,variant)=>{
+      const image=panel.querySelector('.home-work-image');
+      if(!image)return;
+      const preload=new Image();
+      preload.src=variant.src;
+      image.classList.add('is-fading');
+      const apply=()=>{
+        image.src=variant.src;
+        image.alt=variant.alt;
+        requestAnimationFrame(()=>image.classList.remove('is-fading'));
+      };
+      preload.addEventListener('load',apply,{once:true});
+      preload.addEventListener('error',()=>image.classList.remove('is-fading'),{once:true});
+    };
+    const cycleCovers=()=>{
+      coverTimer=0;
+      if(!tickerVisible||document.hidden)return;
+      panelsByWork.forEach((matchingPanels,key)=>{
+        const variants=JSON.parse(matchingPanels[0].dataset.variants||'[]');
+        if(variants.length<2)return;
+        const index=((coverIndexes.get(key)||0)+1)%variants.length;
+        coverIndexes.set(key,index);
+        matchingPanels.forEach(panel=>changeCover(panel,variants[index]));
+      });
+      coverTimer=setTimeout(cycleCovers,4800);
+    };
+    if('IntersectionObserver'in window){
+      new IntersectionObserver(entries=>entries.forEach(entry=>{
+        tickerVisible=entry.isIntersecting;
+        if(tickerVisible){startTicker();clearTimeout(coverTimer);coverTimer=setTimeout(cycleCovers,4800);}
+        else {cancelAnimationFrame(tickerFrame);tickerFrame=0;clearTimeout(coverTimer);}
+      }),{threshold:.01}).observe(homeStage);
+    }else{tickerVisible=true;startTicker();coverTimer=setTimeout(cycleCovers,4800);}
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden&&tickerVisible){startTicker();if(!coverTimer)coverTimer=setTimeout(cycleCovers,4800);}});
+  };
+  fetch(homeWorksUrl).then(response=>response.ok?response.json():Promise.reject()).then(startHomeWorksTicker).catch(()=>{});
+}
+
+// The Works and Series controls are moved while their homepage modules start.
+// Position every completed key from its actual card, not from a former wrapper,
+// so desktop and mobile use precisely the same left/bottom inset.
+const placeHomeCardKeys=()=>{
+  if(!document.body.classList.contains('home'))return;
+  ['artist','series','works','news','press'].forEach(id=>{
+    const section=document.getElementById(id);
+    const outerCard=section?.querySelector(':scope > .side-content');
+    // Artist's white editorial card is its text panel, unlike the other
+    // homepage sections whose white panel is the side-content itself.
+    const card=id==='artist'?section?.querySelector('.artist-detail > div'):outerCard;
+    const key=card?.querySelector('a.key-view-more')||outerCard?.querySelector('a.key-view-more');
+    if(!card||!key)return;
+    card.style.setProperty('position','relative','important');
+    card.style.setProperty('padding-bottom','5rem','important');
+    key.style.setProperty('position','absolute','important');
+    key.style.setProperty('left','var(--space-6)','important');
+    key.style.setProperty('bottom','var(--space-6)','important');
+    key.style.setProperty('margin','0','important');
+    key.style.setProperty('z-index','3','important');
+  });
+};
+requestAnimationFrame(()=>{
+  initialiseViewMoreKeys();
+  placeHomeCardKeys();
+});
 
 if(hero){
   ['about','works','exhibitions','press'].forEach((destination,index)=>{
@@ -636,6 +972,79 @@ if(hero){
   });
 }
 
+// Contact is the final member of the homepage title system. Copy the live
+// Press title typography so it stays identical across responsive sizes.
+if(document.body.classList.contains('home')){
+  const contactTitle=document.querySelector('footer .contact-title');
+  const referenceTitle=document.querySelector('#press>.side-title span');
+  const syncContactTitle=()=>{
+    if(!contactTitle||!referenceTitle)return;
+    const reference=getComputedStyle(referenceTitle);
+    ['fontFamily','fontSize','fontWeight','letterSpacing','lineHeight'].forEach(property=>contactTitle.style.setProperty(property.replace(/[A-Z]/g,letter=>'-'+letter.toLowerCase()),reference[property],'important'));
+    contactTitle.style.setProperty('font-weight','800','important');
+  };
+  syncContactTitle();
+  addEventListener('resize',syncContactTitle,{passive:true});
+}
+
+/* Homepage section rails follow their original full section run: each label
+   starts with its section, pins beneath the header, then releases at its end. */
+if(document.body.classList.contains('home')){
+  const homeRails=[...document.querySelectorAll('main > .side-section > .side-title')];
+  const railMotion=new Map();
+  let railMotionFrame=0;
+  const renderRailMotion=()=>{
+    railMotionFrame=0;
+    let moving=false;
+    railMotion.forEach((state,rail)=>{
+      state.current+=(state.target-state.current)*.18;
+      if(Math.abs(state.target-state.current)<.12)state.current=state.target;
+      else moving=true;
+      rail.style.setProperty('--home-side-title-y',`${state.current.toFixed(2)}px`);
+    });
+    if(moving)railMotionFrame=requestAnimationFrame(renderRailMotion);
+  };
+  const setRailPosition=(rail,target)=>{
+    let state=railMotion.get(rail);
+    if(!state){
+      state={current:target,target};
+      railMotion.set(rail,state);
+      rail.style.setProperty('--home-side-title-y',`${target}px`);
+      return;
+    }
+    state.target=target;
+    if(!railMotionFrame)railMotionFrame=requestAnimationFrame(renderRailMotion);
+  };
+  const syncHomeRails=()=>{
+    const header=document.querySelector('header');
+    const pin=(header?.getBoundingClientRect().height||64)+12;
+    homeRails.forEach(rail=>{
+      const section=rail.parentElement;
+      const word=rail.querySelector('span');
+      if(!word)return;
+      const wordRect=word.getBoundingClientRect();
+      const dividerGap=parseFloat(getComputedStyle(section).getPropertyValue('--home-title-divider-clearance'))||32;
+      const sectionTop=section.getBoundingClientRect().top+window.scrollY;
+      const sectionBottom=sectionTop+section.offsetHeight;
+      const stopTop=sectionBottom-wordRect.height-dividerGap;
+      const documentTop=Math.max(sectionTop,Math.min(window.scrollY+pin,stopTop));
+      const railInsetTop=rail.getBoundingClientRect().top+window.scrollY-sectionTop;
+      const nextTop=Math.max(0,documentTop-sectionTop-railInsetTop);
+      setRailPosition(rail,nextTop);
+    });
+  };
+  let railQueued=false;
+  const queueHomeRailSync=()=>{
+    if(railQueued)return;
+    railQueued=true;
+    requestAnimationFrame(()=>{railQueued=false;syncHomeRails();});
+  };
+  syncHomeRails();
+  addEventListener('scroll',queueHomeRailSync,{passive:true});
+  addEventListener('resize',queueHomeRailSync,{passive:true});
+  addEventListener('load',queueHomeRailSync,{once:true});
+}
+
 document.querySelector('.works-overview .eyebrow')?.remove();
 document.querySelectorAll('.more-panel').forEach(link=>{
   link.addEventListener('pointerdown',event=>event.stopPropagation());
@@ -645,26 +1054,6 @@ document.querySelectorAll('.more-panel').forEach(link=>{
     else location.href=link.href;
   });
 });
-
-// Test-site page entrance sequence: image first, then heading, then detail rows.
-// The classes are assigned only to page content, never to the persistent header/footer.
-(()=>{
-  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-  const content=document.querySelector('.page');
-  if(!content)return;
-  const imageBlocks=[...content.querySelectorAll('.work-main,.image-carousel,.artist-portrait,.square-media,.home-image-break,.works-image-grid figure')];
-  const titleBlocks=[...content.querySelectorAll(':scope > h1,:scope > .section-head h1,:scope > .section-head h2,.work-heading')];
-  const detailBlocks=[...content.querySelectorAll('.work-data > *, .work-details dl > *, .concept-copy > *, .bio > p, .timeline > article, .news > article, .press > article, .work-neighbor-nav, .related-works')];
-  imageBlocks.forEach(block=>block.classList.add('page-enter-image'));
-  titleBlocks.forEach(block=>block.classList.add('page-enter-title'));
-  [...new Set(detailBlocks)].forEach((block,index)=>{
-    block.classList.add('page-enter-detail');
-    block.style.setProperty('--page-enter-delay',`${.52+index*.2}s`);
-  });
-  if(!imageBlocks.length&&!titleBlocks.length&&!detailBlocks.length)return;
-  document.body.classList.add('page-sequence');
-  requestAnimationFrame(()=>requestAnimationFrame(()=>document.body.classList.add('page-sequence-ready')));
-})();
 
 document.body.classList.add('page-entering');
 requestAnimationFrame(()=>requestAnimationFrame(()=>document.body.classList.remove('page-entering')));
@@ -682,30 +1071,34 @@ document.addEventListener('click',event=>{
   Site-wide virtual card scroll.
   Tune these three values to adjust the feel without touching layout:
   sensitivity: wheel / touch distance multiplier; damping: lower = more inertia;
-  influence: portion of viewport height used by the depth effect.
+  influence: fallback portion of viewport height used by non-home pages.
 */
 (()=>{
   if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
 
   const compact=matchMedia('(max-width: 700px)').matches;
-  const mobileHome=compact&&document.body.classList.contains('home');
+  const homePage=document.body.classList.contains('home');
+  const mobileHome=compact&&homePage;
   const desktopWorks=!compact&&!!document.querySelector('.works-overview');
   const mobileWorks=compact&&!!document.querySelector('.works-overview');
-  // Higher damping makes the visual response follow the page scroll more promptly.
-  // A broader influence range also leaves a larger, clearer centre area.
-  const primaryBrowse=document.body.classList.contains('home')||!!document.querySelector('.works-overview');
+  // Homepage uses edge bands: top 15% and bottom 15% carry the depth cue,
+  // while the centre 70% remains completely clear.
+  const primaryBrowse=homePage||!!document.querySelector('.works-overview');
   const settings={
-    damping:desktopWorks ? .16 : (primaryBrowse ? .13 : .11),
+    damping:desktopWorks ? .16 : (primaryBrowse ? .14 : .11),
+    homeEdgeBand:.15,
     influence:mobileHome ? .98 : ((desktopWorks||mobileWorks) ? .74 : .91),
-    maxScaleDrop:mobileWorks ? .24 : (desktopWorks ? .18 : (mobileHome ? .12 : .10)),
-    maxBlur:mobileWorks ? 10 : (desktopWorks ? 8 : (mobileHome ? 5 : 4))
+    maxScaleDrop:mobileWorks ? .045 : (desktopWorks ? .045 : (homePage ? (compact ? .03 : .045) : .035)),
+    maxBlur:mobileWorks ? 0 : (desktopWorks ? 2.5 : (homePage ? (compact ? 0 : 3.2) : 2)),
+    maxOpacityDrop:homePage ? (compact ? .46 : .5) : .4
   };
   const selector=[
     '.work-list article','.works-image-grid > a','.works-index > a',
     '.news article','.press-card','.timeline article','.artist-cv article',
     '.series-entry','.series-hero figure','.artist-portrait,.image-carousel',
     '.home-image-break,.press-side-image,.artist-film',
-    '.home .artist-detail,.home .series-entry-section,.home .press-layout',
+    '.home .artist-detail,.home .press-layout',
+    '.home .hero,.home .side-content,.home .donut-sequence__stage,.home .horizontal-image-ticker',
     '.work-variants','h1,h2,h3',
     '.related-works > div > a'
   ].join(',');
@@ -714,7 +1107,22 @@ document.addEventListener('click',event=>{
   let target=window.scrollY,current=window.scrollY,frame=0;
   const baseTransforms=new WeakMap();
   const collectCards=()=>{
-    cards=[...document.querySelectorAll(selector)];
+    cards=[...document.querySelectorAll(selector)].filter(card=>{
+      // News copy is always individually clear. Its containing card gets a
+      // depth cue only once its bottom is almost leaving the viewport.
+      if(homePage&&card.matches('.home #news article,.home #news h3,.home #news p,.home #news time'))return false;
+      // On the desktop home page the independent glass panel is the single
+      // depth surface. Its children must not scale a second time. Mobile keeps
+      // its existing, unmodified composition.
+      if(homePage&&!compact){
+        if(card.closest('.side-content')&&!card.matches('.home .side-content'))return false;
+        if(card.closest('.hero')&&!card.matches('.home .hero'))return false;
+      }
+      // News stays legible until its containing card itself approaches a
+      // viewport edge; individual stories never receive their own blur pass.
+      if(homePage&&card.matches('.home #news article,.home #news h3,.home #news p,.home #news time'))return false;
+      return !(mobileHome&&card.matches('.home .side-content,.home .donut-sequence__stage,.home .horizontal-image-ticker'));
+    });
     cards.forEach(card=>{
       if(!baseTransforms.has(card))baseTransforms.set(card,getComputedStyle(card).transform);
     });
@@ -727,8 +1135,6 @@ document.addEventListener('click',event=>{
     frame=0;
     current+=(target-current)*settings.damping;
     if(Math.abs(target-current)<.1)current=target;
-    const center=innerHeight*.5;
-    const range=innerHeight*settings.influence;
     const atPageEdge=target<2||target>maxScroll()-2;
     cards.forEach(card=>{
       // Keep nested typography clear while allowing its parent card to retain
@@ -749,16 +1155,34 @@ document.addEventListener('click',event=>{
       const rect=card.getBoundingClientRect();
       // Rect follows native scrolling; offset it toward the eased scroll position
       // so scaling and blur glide rather than jump with each wheel tick.
-      const distance=Math.abs(rect.top+rect.height*.5+(window.scrollY-current)-center);
-      if(distance>range*2.1)return;
-      const t=Math.max(0,Math.min(1,distance/range));
+      const visualCenter=rect.top+rect.height*.5+(window.scrollY-current);
+      let t=0;
+      if(homePage){
+        if(card.matches('.home #news > .side-content')){
+          // Reading stays sharp from entry through the final item. The cue
+          // appears only as the card enters from below or leaves above.
+          const exitBand=innerHeight*.16;
+          t=rect.top>innerHeight-exitBand?(rect.top-(innerHeight-exitBand))/exitBand:(rect.bottom<exitBand?(exitBand-rect.bottom)/exitBand:0);
+        }else{
+          const edge=innerHeight*settings.homeEdgeBand;
+          const lowerEdge=innerHeight-edge;
+          t=visualCenter<edge ? (edge-visualCenter)/edge : (visualCenter>lowerEdge ? (visualCenter-lowerEdge)/edge : 0);
+        }
+      }else{
+        const center=innerHeight*.5;
+        const range=innerHeight*settings.influence;
+        const distance=Math.abs(visualCenter-center);
+        if(distance>range*2.1)t=1;
+        else t=distance/range;
+      }
+      t=Math.max(0,Math.min(1,t));
       const ease=t*t;
       const base=baseTransforms.get(card);
       card.style.setProperty('transform',(base&&base!=='none'?base+' ':'')+'scale('+(1-ease*settings.maxScaleDrop)+')','important');
       // On compact touch screens opacity keeps the depth cue without the
       // expensive GPU blur pass. Desktop retains the blur treatment.
       card.style.setProperty('filter',compact?'none':'blur('+(ease*settings.maxBlur)+'px)','important');
-      card.style.setProperty('opacity',String(1-ease*.4),'important');
+      card.style.setProperty('opacity',String(1-ease*settings.maxOpacityDrop),'important');
     });
     if(current!==target)frame=requestAnimationFrame(render);
   };
@@ -774,6 +1198,29 @@ document.addEventListener('click',event=>{
     requestRender();
   }).observe(document.body,{childList:true,subtree:true});
   requestRender();
+})();
+
+
+// Homepage Donut sequence: frame 32 is the resting composition.
+(()=>{
+  if(!document.body.classList.contains('home')||document.querySelector('.donut-sequence'))return;
+  const series=document.querySelector('#series');if(!series)return;
+  series.insertAdjacentHTML('afterend','<section id="donut-scroll" class="donut-sequence" aria-label="Donut sculpture sequence"><a class="donut-sequence__link" href="works/power-food.html" aria-label="Open Power Food work detail"><div class="donut-sequence__stage"><canvas aria-label="Donut sculpture sequence"></canvas><div class="donut-sequence__loading">Loading 0%</div></div></a></section>');
+  const section=document.querySelector('.donut-sequence'),stage=section.querySelector('.donut-sequence__stage'),canvas=stage.querySelector('canvas'),context=canvas.getContext('2d'),loading=section.querySelector('.donut-sequence__loading');
+  const indexes=Array.from({length:45},(_,i)=>i+1),frames=[],paths=indexes.map(i=>'assets/catalog/donut/frames/'+String(i).padStart(3,'0')+'.webp?v=4');
+  let loaded=0,target=31,current=target,shown=-1,animationFrame=0,sequenceVisible=false;
+  const render=force=>{const index=Math.max(0,Math.min(frames.length-1,Math.round(current))),image=frames[index];if(!image||(!force&&shown===index))return;shown=index;const w=canvas.width,h=canvas.height,scale=Math.min(w/image.naturalWidth,h/image.naturalHeight)*.936,dw=image.naturalWidth*scale,dh=image.naturalHeight*scale;context.clearRect(0,0,w,h);context.drawImage(image,(w-dw)/2,(h-dh)/2,dw,dh);};
+  const resize=()=>{const ratio=Math.min(devicePixelRatio||1,2),box=stage.getBoundingClientRect();canvas.width=Math.max(1,Math.round(box.width*ratio));canvas.height=Math.max(1,Math.round(box.height*ratio));render(true);};
+  const requestAnimation=()=>{if(sequenceVisible&&!animationFrame)animationFrame=requestAnimationFrame(animate);};
+  const followPage=()=>{const resting=section.offsetTop+section.offsetHeight/2-innerHeight/2,span=Math.max(innerHeight*.52,section.offsetHeight*.27),position=scrollY-resting;if(position<=-span)target=0;else if(position<-.18*span)target=(position+span)/(.82*span)*31;else if(position<.08*span)target=31;else if(position<.26*span)target=31+(position-.08*span)/(.18*span)*4;else if(position<1.46*span)target=35+(position-.26*span)/(1.2*span)*9;else target=frames.length-1;requestAnimation();};
+  const animate=()=>{animationFrame=0;current+=(target-current)*.16;if(Math.abs(target-current)<.012)current=target;const momentum=Math.max(-1,Math.min(1,(target-current)*.22));stage.style.setProperty('--donut-tilt-y',(momentum*3.2).toFixed(2)+'deg');stage.style.setProperty('--donut-tilt-x',(Math.abs(momentum)*1.15).toFixed(2)+'deg');render();if(current!==target)requestAnimation();};
+  const begin=()=>{section.classList.add('is-ready');loading.remove();resize();followPage();addEventListener('resize',()=>{resize();followPage();},{passive:true});addEventListener('scroll',followPage,{passive:true});if('IntersectionObserver'in window)new IntersectionObserver(entries=>entries.forEach(entry=>{sequenceVisible=entry.isIntersecting;if(sequenceVisible){followPage();requestAnimation();}else{cancelAnimationFrame(animationFrame);animationFrame=0;}}),{threshold:0}).observe(section);else{sequenceVisible=true;requestAnimation();}};
+  let preloadStarted=false;
+  const preload=()=>{if(preloadStarted)return;preloadStarted=true;paths.forEach((source,index)=>{const image=new Image();image.decoding='async';const done=()=>{frames[index]=image;loaded+=1;loading.textContent='Loading '+Math.round(loaded/paths.length*100)+'%';if(loaded===paths.length)begin();};image.onload=done;image.onerror=done;image.src=source;});};
+  // The Artist film owns the preceding download slot. Once it is ready to
+  // play, the Donut frames may download without competing with it.
+  if(document.body.dataset.artistFilmReady==='true')preload();
+  else window.addEventListener('poren:artist-film-ready',preload,{once:true});
 })();
 
 // Full-site page transition. The animation remains absent from dedicated test
@@ -797,6 +1244,9 @@ document.addEventListener('click',event=>{
     const href=link.getAttribute('href')||'';
     if(href.startsWith('mailto:')||href.startsWith('tel:')||href.startsWith('#'))return false;
     const url=new URL(link.href,location.href);
+    // Returning to the homepage is immediate; the donut transition is only
+    // used when moving between inner pages.
+    if(url.pathname==='/'||/\/index\.html$/.test(url.pathname))return false;
     return url.origin===location.origin&&!sameDocument(url);
   };
   const play=()=>new Promise(resolve=>{
@@ -844,6 +1294,9 @@ document.addEventListener('click',event=>{
 (()=>{
   const mobile=matchMedia('(max-width: 47.9375rem)');
   const setup=()=>{
+    // Mobile artwork loading deliberately uses the page's white background.
+    // No skeleton wrapper is added, so existing picture/srcset choices remain intact.
+    return;
     if(!mobile.matches)return;
     document.querySelectorAll('.works-image-grid figure img,.work-gallery figure img,.related-works figure img,.work-list figure img').forEach(img=>{
       const shell=img.closest('figure');
@@ -861,4 +1314,185 @@ document.addEventListener('click',event=>{
   };
   setup();
   mobile.addEventListener?.('change',setup);
+})();
+
+// Fixed scroll walker. The horizontal position is derived from actual page
+// progress, so scrolling up retraces the same route as scrolling down.
+(()=>{
+  if(window.__porenScrollWalker)return;
+  window.__porenScrollWalker=true;
+  const walkerStyle=document.createElement('style');
+  walkerStyle.textContent='.scroll-walker{position:fixed!important;z-index:20001!important;left:0!important;bottom:max(24px,calc(env(safe-area-inset-bottom) + 16px))!important;width:12vh!important;height:12vh!important;min-width:72px!important;min-height:72px!important;max-width:168px!important;max-height:168px!important;pointer-events:none!important;will-change:transform!important;transition:opacity .3s ease,visibility 0s linear 0s!important}.intro-active .scroll-walker{opacity:0!important;visibility:hidden!important}.scroll-walker__idle,.scroll-walker__walk,.scroll-walker__walk-image{display:block;width:100%;height:100%;object-fit:contain}.scroll-walker__walk,.scroll-walker__walk-image{display:none!important}.scroll-walker__canvas{display:none!important}.scroll-walker.is-walking .scroll-walker__walk.is-active{display:block!important}.scroll-walker.is-walking .scroll-walker__idle{display:none}.scroll-walker.is-alpha-walker .scroll-walker__walk{display:none!important}.scroll-walker.is-alpha-walker.is-walking .scroll-walker__walk-image{display:block!important}body.home #artist>.side-content{position:relative!important;left:var(--artist-screen-offset,0px)!important}@media(max-width:700px){.scroll-walker{width:10.8vh!important;height:10.8vh!important;max-width:151px!important;max-height:151px!important}body.home #press>.side-content{zoom:1!important}body.home #press .press-layout{display:flex!important;flex-direction:column!important;gap:4rem!important}body.home #press .press-side-image{display:block!important;position:static!important;width:100%!important;aspect-ratio:1 / 1!important;order:1!important;margin:0!important}body.home #press .press-list{display:block!important;order:2!important;margin:0!important}body.home #artist .artist-detail>div{padding-left:0!important;padding-right:0!important;text-align:center!important}body.home #artist .artist-detail h2{font-size:clamp(1.4rem,6.3vw,1.72rem)!important;line-height:1.18!important;text-align:center!important}body.home #artist .artist-detail>div p{font-size:.82rem!important;line-height:1.65!important;text-align:center!important}}@media(prefers-reduced-motion:reduce){.scroll-walker__canvas{display:none!important}.scroll-walker__idle{display:block!important}}';
+  document.head.append(walkerStyle);
+  // This runtime walker stylesheet is appended after the main stylesheet.
+  // Keep its mobile Press fallback centred and reserve clear reading space below it.
+  const walkerPressLayoutStyle=document.createElement('style');
+  walkerPressLayoutStyle.textContent='@media(max-width:700px){body.home #press .press-layout{display:flex!important;flex-direction:column!important}body.home #press .press-side-image{margin:0 auto!important;aspect-ratio:auto!important;height:auto!important;max-height:none!important;overflow:visible!important}body.home #press .press-side-image img{display:block!important;width:100%!important;height:auto!important;object-fit:contain!important}body.home #press .press-list{margin:var(--space-7) 0 0!important}}';
+  document.head.append(walkerPressLayoutStyle);
+  const walker=document.createElement('div');
+  walker.className='scroll-walker';
+  walker.setAttribute('aria-hidden','true');
+  walker.innerHTML='<img class="scroll-walker__idle" data-src="assets/media/scroll-character-idle-512.webp" alt=""><img class="scroll-walker__walk-image" data-right-src="assets/media/scroll-character-right-alpha.webp" data-left-src="assets/media/scroll-character-left-alpha.webp" alt=""><canvas class="scroll-walker__canvas"></canvas><video class="scroll-walker__walk scroll-walker__walk--right" muted playsinline loop preload="none" data-src="assets/media/scroll-character-right-transparent.webm"></video><video class="scroll-walker__walk scroll-walker__walk--left" muted playsinline loop preload="none" data-src="assets/media/scroll-character-left-transparent.webm"></video>';
+  document.body.append(walker);
+  const idle=walker.querySelector('.scroll-walker__idle');
+  const walkImage=walker.querySelector('.scroll-walker__walk-image');
+  const canvas=walker.querySelector('.scroll-walker__canvas');
+  const context=canvas.getContext('2d',{willReadFrequently:true});
+  const videos={right:walker.querySelector('.scroll-walker__walk--right'),left:walker.querySelector('.scroll-walker__walk--left')};
+  const compact=matchMedia('(max-width:700px)');
+  const warmWalkerMedia=()=>{
+    if(walker.dataset.mediaReady)return;
+    walker.dataset.mediaReady='true';
+    idle.src=idle.dataset.src;
+    if(compact.matches)walkImage.src=walkImage.dataset.rightSrc;
+    else Object.values(videos).forEach(video=>{video.innerHTML=`<source src="${video.dataset.src}" type="video/webm">`;video.preload='metadata';video.load();});
+  };
+  // Fetch the lower walker alongside the first banner film. It remains hidden
+  // until the opening completes, so its visual behaviour does not change.
+  if(document.body.dataset.heroMediaStarted==='true')warmWalkerMedia();
+  else window.addEventListener('poren:hero-media-start',warmWalkerMedia,{once:true});
+  let position=0,targetPosition=0,direction='',stopTimer=0,positionFrame=0,videoFrame=0,videoVideoFrame=0,activeVideo=null,pageScrollRange=1;
+  const scheduleWalkVideoFrame=()=>{
+    if(!activeVideo)return;
+    if('requestVideoFrameCallback' in activeVideo)videoVideoFrame=activeVideo.requestVideoFrameCallback(renderVideo);
+    else videoFrame=requestAnimationFrame(renderVideo);
+  };
+  const characterWidth=()=>walker.getBoundingClientRect().width||innerHeight*.12;
+  const travelBounds=()=>{
+    // Use the complete viewport rather than clientWidth (which excludes the
+    // scrollbar). This makes the visible left and right margins identical.
+    const available=Math.max(0,innerWidth-characterWidth());
+    // Keep the route centred. Desktop was already an 84% lane; both routes
+    // now travel 15% less while retaining identical left/right margins.
+    const lane=available*(compact.matches?.85:(.84*.85));
+    const start=(available-lane)/2;
+    return {start,end:start+lane};
+  };
+  const clamp=value=>{const bounds=travelBounds();return Math.max(bounds.start,Math.min(bounds.end,value));};
+  const measurePageRoute=()=>{
+    pageScrollRange=Math.max(1,Math.round(document.documentElement.scrollHeight-innerHeight));
+    document.documentElement.dataset.walkerScrollRange=String(pageScrollRange);
+    return pageScrollRange;
+  };
+  const pageProgress=()=>Math.max(0,Math.min(1,scrollY/pageScrollRange));
+  const place=()=>{position=clamp(position);targetPosition=clamp(targetPosition);walker.style.transform='translate3d('+position+'px,0,0)';};
+  const easePosition=()=>{
+    position+=(targetPosition-position)*.12;
+    if(Math.abs(targetPosition-position)>.25)positionFrame=requestAnimationFrame(easePosition);
+    else {position=targetPosition;positionFrame=0;}
+    place();
+  };
+  const moveTo=next=>{targetPosition=clamp(next);if(!positionFrame)positionFrame=requestAnimationFrame(easePosition);};
+  const renderVideo=()=>{
+    if(!activeVideo||activeVideo.paused)return;
+    const sourceWidth=activeVideo.videoWidth,sourceHeight=activeVideo.videoHeight;
+    if(sourceWidth&&sourceHeight){
+      // Match the canvas backing store to high-density displays so the fixed
+      // scroll character stays sharp at its existing visual size.
+      const renderedHeight=walker.getBoundingClientRect().height||168;
+      const height=Math.min(720,Math.max(480,Math.round(renderedHeight*Math.min(3,devicePixelRatio||1)*1.5))),width=Math.max(1,Math.round(height*sourceWidth/sourceHeight));
+      if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}
+      context.imageSmoothingEnabled=true;
+      context.imageSmoothingQuality='high';
+      context.clearRect(0,0,width,height);
+      context.drawImage(activeVideo,0,0,width,height);
+      const frame=context.getImageData(0,0,width,height),pixels=frame.data;
+      for(let index=0;index<pixels.length;index+=4){
+        if(Math.min(pixels[index],pixels[index+1],pixels[index+2])>225){pixels[index+3]=0;continue;}
+        if(Math.max(pixels[index],pixels[index+1],pixels[index+2])>75){pixels[index]=198;pixels[index+1]=255;pixels[index+2]=52;}
+      }
+      context.putImageData(frame,0,0);
+    }
+    scheduleWalkVideoFrame();
+  };
+  const stop=()=>{
+    direction='';walker.classList.remove('is-walking','is-left','is-right');idle.hidden=false;
+    cancelAnimationFrame(positionFrame);positionFrame=0;
+    const bounds=travelBounds(),atEnd=Math.abs(targetPosition-bounds.start)<.25||Math.abs(targetPosition-bounds.end)<.25;
+    if(atEnd)position=targetPosition;else targetPosition=position;
+    place();cancelAnimationFrame(videoFrame);activeVideo?.cancelVideoFrameCallback?.(videoVideoFrame);activeVideo=null;
+    Object.values(videos).forEach(video=>{video.pause();video.currentTime=0;});
+  };
+  const walk=nextDirection=>{
+    warmWalkerMedia();
+    if(direction!==nextDirection){
+      direction=nextDirection;walker.classList.toggle('is-left',nextDirection==='left');walker.classList.toggle('is-right',nextDirection==='right');walker.classList.add('is-walking');idle.hidden=true;
+      const useAlphaWalker=compact.matches;
+      walker.classList.toggle('is-alpha-walker',useAlphaWalker);
+      if(useAlphaWalker){
+        walkImage.src=walkImage.dataset[nextDirection==='left'?'leftSrc':'rightSrc'];
+        activeVideo=null;
+        Object.values(videos).forEach(video=>{video.pause();video.currentTime=0;video.classList.remove('is-active');});
+      }else{
+        const current=videos[nextDirection],other=videos[nextDirection==='left'?'right':'left'];
+        other.pause();other.currentTime=0;current.currentTime=0;current.playbackRate=.72;activeVideo=current;
+        Object.values(videos).forEach(video=>video.classList.toggle('is-active',video===current));
+        cancelAnimationFrame(videoFrame);activeVideo?.cancelVideoFrameCallback?.(videoVideoFrame);current.play().catch(()=>{});
+      }
+    }
+    clearTimeout(stopTimer);
+    stopTimer=setTimeout(stop,220);
+  };
+  const syncToPageProgress=()=>{
+    const bounds=travelBounds(),destination=bounds.start+(bounds.end-bounds.start)*pageProgress();
+    if(Math.abs(destination-position)<.5){position=destination;targetPosition=destination;place();return;}
+    walk(destination>position?'right':'left');moveTo(destination);
+  };
+  const recordSectionPositions=()=>{
+    if(compact.matches)return;
+    const limit=measurePageRoute(),bounds=travelBounds(),records={};
+    document.querySelectorAll('.home-section-nav a').forEach(link=>{
+      const selector=link.getAttribute('href'),section=selector==='#top'?null:document.querySelector(selector);
+      const screenY=section?Math.min(limit,Math.max(0,section.getBoundingClientRect().top+scrollY)):0;
+      const x=bounds.start+(bounds.end-bounds.start)*(screenY/limit);
+      records[selector]={screenY:Math.round(screenY),characterX:Math.round(x)};
+      link.dataset.walkerPosition=String(Math.round(x));
+      link.dataset.walkerScrollY=String(Math.round(screenY));
+    });
+    window.__porenWalkerSectionPositions=records;
+  };
+  const centerArtistOnViewport=()=>{
+    const content=document.querySelector('body.home #artist > .side-content');
+    if(!content)return;
+    content.style.setProperty('--artist-screen-offset','0px');
+    const rect=content.getBoundingClientRect();
+    const correction=innerWidth/2-(rect.left+rect.width/2);
+    content.style.setProperty('--artist-screen-offset',Math.round(correction*100)/100+'px');
+  };
+  let calibrationFrame=0;
+  const recalibrateRoute=()=>{
+    cancelAnimationFrame(calibrationFrame);
+    calibrationFrame=requestAnimationFrame(()=>{
+      calibrationFrame=0;
+      measurePageRoute();
+      centerArtistOnViewport();
+      syncToPageProgress();
+      recordSectionPositions();
+    });
+  };
+  addEventListener('wheel',event=>{
+    if(!event.deltaY||event.target.closest?.('.work-stage,.horizontal-image-ticker'))return;
+    const amount=event.deltaMode===1?event.deltaY*16:event.deltaMode===2?event.deltaY*innerHeight:event.deltaY;
+    const limit=pageScrollRange,atBottom=amount>0&&scrollY>=limit-2,atTop=amount<0&&scrollY<=2;
+    if(atBottom||atTop){const bounds=travelBounds(),destination=atBottom?bounds.end:bounds.start;targetPosition=destination;if(Math.abs(position-destination)<.5){position=destination;place();}walk(atBottom?'right':'left');return;}
+    walk(amount>0?'right':'left');
+  },{passive:true,capture:true});
+  let walkerScrollFrame=0;
+  const queueWalkerScroll=()=>{
+    if(walkerScrollFrame)return;
+    walkerScrollFrame=requestAnimationFrame(()=>{walkerScrollFrame=0;syncToPageProgress();});
+  };
+  addEventListener('scroll',queueWalkerScroll,{passive:true});
+  addEventListener('resize',()=>{place();recalibrateRoute();},{passive:true});
+  addEventListener('poren:section-select',()=>{if(!compact.matches)recalibrateRoute();});
+  measurePageRoute();position=travelBounds().start;targetPosition=position;place();centerArtistOnViewport();recordSectionPositions();
+  document.fonts?.ready.then(recalibrateRoute);
+  document.querySelectorAll('img,video').forEach(media=>{
+    media.addEventListener('load',recalibrateRoute,{once:true});
+    media.addEventListener('loadedmetadata',recalibrateRoute,{once:true});
+  });
+  if('ResizeObserver' in window){
+    const observer=new ResizeObserver(recalibrateRoute);
+    observer.observe(document.body);
+  }
 })();

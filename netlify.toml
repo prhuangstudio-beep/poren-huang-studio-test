@@ -44,3 +44,10 @@
   for = "/assets/media/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# Every versioned static asset can be kept locally by the browser. HTML remains
+# uncached so content, navigation and page metadata still update immediately.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

@@ -4,13 +4,35 @@ const sharp = require('sharp');
 
 const root = path.resolve(__dirname, '..');
 const site = 'https://porenhuang.com';
-const works = JSON.parse(fs.readFileSync(path.join(root, 'data', 'works.json'), 'utf8')).sort((a, b) => a.order - b.order);
+const brandIconHead = '<link rel="icon" type="image/x-icon" href="/favicon.ico"><link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png"><link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest"><meta name="theme-color" content="#ffffff">';
+const works = JSON.parse(fs.readFileSync(path.join(root, 'data', 'works.json'), 'utf8')).map(work => ({ ...work, previous_slugs: work.previous_slugs || [] })).sort((a, b) => a.order - b.order);
 const read = name => fs.readFileSync(path.join(root, 'templates', name), 'utf8');
 const write = (file, value) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, value); };
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const clean = value => String(value ?? '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 const render = (template, values) => template.replace(/{{(\w+)}}/g, (_, key) => values[key] ?? '');
 const title = work => [work.title_en, work.title_zh].filter(Boolean).join(' ');
+const redirectSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+function redirectPage(previousSlug, currentSlug) {
+  const destination = `/works/${currentSlug}.html`;
+  return `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="robots" content="noindex,follow"><meta http-equiv="refresh" content="0; url=${destination}"><link rel="canonical" href="${site}/works/${currentSlug}"><title>Redirecting…</title><script>location.replace(${JSON.stringify(destination)});</script></head><body><p>Redirecting to <a href="${destination}">${destination}</a>.</p></body></html>`;
+}
+function buildPreviousSlugRedirects() {
+  const currentSlugs = new Set(works.map(work => work.slug));
+  const previousSlugs = new Map();
+  works.forEach(work => {
+    if (!Array.isArray(work.previous_slugs)) throw new Error(`previous_slugs must be an array for ${work.slug}`);
+    work.previous_slugs.forEach(value => {
+      const previousSlug = String(value || '').trim();
+      if (!redirectSlugPattern.test(previousSlug)) throw new Error(`Invalid previous slug "${previousSlug}" for ${work.slug}`);
+      if (currentSlugs.has(previousSlug)) throw new Error(`Previous slug "${previousSlug}" conflicts with an active work URL.`);
+      if (previousSlugs.has(previousSlug)) throw new Error(`Previous slug "${previousSlug}" is assigned to both ${previousSlugs.get(previousSlug)} and ${work.slug}.`);
+      previousSlugs.set(previousSlug, work.slug);
+    });
+  });
+  previousSlugs.forEach((currentSlug, previousSlug) => write(path.join(root, 'works', `${previousSlug}.html`), redirectPage(previousSlug, currentSlug)));
+  return previousSlugs.size;
+}
 const imageUrl = image => `${site}/${image.filename}`;
 const imageSize = filename => {
   const data = fs.readFileSync(path.join(root, filename));
@@ -43,31 +65,36 @@ function artworkSchema(work) {
     ...numberValues(work), description: workDescription(work), url: `${site}/works/${work.slug}`
   };
 }
-function card(work) {
+// A sculpture appears once in the overview. Its colour/material variants stay
+// as separate detail pages, while their first photographs rotate in one card.
+const workFamilyKey = work => [work.title_en, work.title_zh, work.year].map(value => String(value || '').trim().toLocaleLowerCase()).join('|');
+const workFamilies = [...works.reduce((families, work) => {
+  const key = workFamilyKey(work);
+  if (!families.has(key)) families.set(key, []);
+  families.get(key).push(work);
+  return families;
+}, new Map()).values()];
+function card(family) {
+  const work = family[0];
   const first = work.images[0];
-  const search = [work.title_en, work.title_zh, work.year, work.material_en, work.material_zh].filter(Boolean).join(' ').toLocaleLowerCase();
-  return `<a class="work-card" data-work-card data-year="${esc(work.year)}" data-search="${esc(search)}" href="works/${esc(work.slug)}"><figure>${picture(first)}</figure><div class="works-card-meta"><strong lang="en">${esc(work.title_en)}</strong>${work.title_zh ? `<span>${esc(work.title_zh)}</span>` : ''}<time>${esc(work.year)}</time></div></a>`;
+  const search = family.flatMap(item => [item.title_en, item.title_zh, item.year, item.material_en, item.material_zh, item.colorway]).filter(Boolean).join(' ').toLocaleLowerCase();
+  const slides = family.map((item, index) => {
+    const image = item.images[0];
+    if (!image) return '';
+    return `<span class="work-card-slide${index === 0 ? ' is-active' : ''}"${index === 0 ? '' : ' aria-hidden="true"'}>${picture(image, { lazy: index !== 0 })}</span>`;
+  }).join('');
+  const variants = family.length > 1 ? ` data-work-variants="${family.length}"` : '';
+  return `<a class="work-card" data-work-card${variants} data-year="${esc(work.year)}" data-search="${esc(search)}" href="works/${esc(work.slug)}"><figure class="works-cover work-card-carousel" data-work-card-carousel aria-label="${esc(title(work))}">${slides || picture(first)}</figure><div class="works-card-meta"><strong lang="en">${esc(work.title_en)}</strong>${work.title_zh ? `<span>${esc(work.title_zh)}</span>` : ''}<time>${esc(work.year)}</time></div></a>`;
 }
 const indexTemplate = read('works-index.html');
 const years = [...new Set(works.map(work => work.year))].sort((a, b) => b - a);
 const hreflang = url => `<link rel="alternate" hreflang="zh-Hant" href="${url}"><link rel="alternate" hreflang="en" href="${url}"><link rel="alternate" hreflang="x-default" href="${url}">`;
-const indexPage = render(indexTemplate, { yearOptions: years.map(year => `<option value="${year}">${year}</option>`).join(''), workCards: works.map(card).join(''), hreflang: hreflang(`${site}/works`) });
+const indexPage = render(indexTemplate, { yearOptions: years.map(year => `<option value="${year}">${year}</option>`).join(''), workCards: workFamilies.map(card).join(''), hreflang: hreflang(`${site}/works`) });
 write(path.join(root, 'works', 'index.html'), indexPage);
 write(path.join(root, 'works.html'), indexPage);
 
 const detailTemplate = read('work-page.html');
 works.forEach((work, index) => {
-  // Colour/material variants share a title, but adjacent navigation should
-  // always lead to a different artwork rather than another version of itself.
-  const adjacentDistinct = direction => {
-    for (let offset = 1; offset < works.length; offset++) {
-      const candidate = works[(index + direction * offset + works.length) % works.length];
-      if (candidate.title_en !== work.title_en) return candidate;
-    }
-    return work;
-  };
-  const previous = adjacentDistinct(-1);
-  const next = adjacentDistinct(1);
   const metadata = [
     work.dimensions?.length ? `<p>${work.dimensions.map(dimText).map(esc).join('<br>')}</p>` : '',
     work.material_en ? `<p>${esc(work.material_en)}${work.material_zh ? ` / ${esc(work.material_zh)}` : ''}</p>` : '',
@@ -84,11 +111,11 @@ works.forEach((work, index) => {
     ogImage: `${site}/assets/og/${work.slug}.jpg`, schema: JSON.stringify(artworkSchema(work)), mainImage: picture(work.images[0], { lazy: false }), mainAlt: esc(work.images[0].alt_zh || work.images[0].alt_en), hreflang: hreflang(`${site}/works/${work.slug}`),
     thumbnails, heading: `<span class="work-title-en" lang="en">${esc(work.title_en)}</span>${work.title_zh ? `<span class="work-title-zh" lang="zh-Hant">${esc(work.title_zh)}</span>` : ''}`, year: esc(work.year), metadata,
     workContact: `<a class="work-contact-me" target="_blank" rel="noopener noreferrer" href="https://mail.google.com/mail/?view=cm&fs=1&to=pr_dogs@yahoo.com.tw&su=${encodeURIComponent(contactSubject)}&body=${encodeURIComponent(contactBody)}">CONTACT ME</a>`,
-    descriptionBlock: description ? `<div class="work-description"><p>${esc(description).replace(/\n/g, '<br>')}</p></div>` : '', relatedWorks,
-    neighbors: `<a href="works/${esc(previous.slug)}"><span>Prev</span><strong>${esc(previous.title_en)}</strong></a><a href="works/${esc(next.slug)}"><span>Next</span><strong>${esc(next.title_en)}</strong></a>`
+    descriptionBlock: description ? `<div class="work-description"><p>${esc(description).replace(/\n/g, '<br>')}</p></div>` : '', relatedWorks
   };
   write(path.join(root, 'works', `${work.slug}.html`), render(detailTemplate, values));
 });
+const redirectCount = buildPreviousSlugRedirects();
 
 // The shared Person source is inserted on the two manually-authored pages on every build.
 ['index.html', 'about.html'].forEach(file => {
@@ -206,8 +233,48 @@ async function updateStaticSocialMeta() {
   }
 }
 
+async function generateBrandIcons() {
+  const source = path.join(root, 'assets', 'icons', 'pr-black.png');
+  if (!fs.existsSync(source)) throw new Error('Missing brand icon source: assets/icons/pr-black.png');
+  const render = async (size, { opaque = false } = {}) => {
+    const logo = await sharp(source).trim({ background: '#ffffff', threshold: 12 }).resize(Math.round(size * 0.62), Math.round(size * 0.62), { fit: 'contain' }).png().toBuffer();
+    const radius = Math.round(size * 0.18);
+    const background = Buffer.from(`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg"><rect width="${size}" height="${size}" rx="${radius}" fill="#ffffff"/></svg>`);
+    const canvas = sharp({ create: { width: size, height: size, channels: 4, background: opaque ? '#ffffff' : { r: 255, g: 255, b: 255, alpha: 0 } } }).composite([{ input: background }, { input: logo, gravity: 'centre' }]);
+    return opaque ? canvas.flatten({ background: '#ffffff' }).png().toBuffer() : canvas.png().toBuffer();
+  };
+  const named = [[16, 'favicon-16x16.png'], [32, 'favicon-32x32.png'], [180, 'apple-touch-icon.png'], [192, 'android-chrome-192x192.png'], [512, 'android-chrome-512x512.png']];
+  const buffers = await Promise.all(named.map(([size, file]) => render(size, { opaque: file === 'apple-touch-icon.png' })));
+  await Promise.all(named.map(([, file], index) => fs.promises.writeFile(path.join(root, file), buffers[index])));
+  const icoImages = await Promise.all([16, 32, 48].map(size => render(size)));
+  const header = Buffer.alloc(6 + icoImages.length * 16);
+  header.writeUInt16LE(0, 0); header.writeUInt16LE(1, 2); header.writeUInt16LE(icoImages.length, 4);
+  let offset = header.length;
+  icoImages.forEach((image, index) => {
+    const entry = 6 + index * 16;
+    const size = [16, 32, 48][index];
+    header[entry] = size; header[entry + 1] = size; header[entry + 2] = 0; header[entry + 3] = 0;
+    header.writeUInt16LE(1, entry + 4); header.writeUInt16LE(32, entry + 6);
+    header.writeUInt32LE(image.length, entry + 8); header.writeUInt32LE(offset, entry + 12); offset += image.length;
+  });
+  await fs.promises.writeFile(path.join(root, 'favicon.ico'), Buffer.concat([header, ...icoImages]));
+  await fs.promises.writeFile(path.join(root, 'site.webmanifest'), JSON.stringify({ name: 'Poren Huang Studio', short_name: 'Poren Huang', icons: [{ src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png' }, { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png' }], theme_color: '#ffffff', background_color: '#ffffff', display: 'standalone' }, null, 2) + '\n');
+}
+
+function addBrandIconsToAllPages() {
+  const rootPages = fs.readdirSync(root).filter(file => file.endsWith('.html'));
+  const workPages = fs.readdirSync(path.join(root, 'works')).filter(file => file.endsWith('.html')).map(file => path.join('works', file));
+  [...rootPages, ...workPages].forEach(relative => {
+    const target = path.join(root, relative);
+    let html = fs.readFileSync(target, 'utf8');
+    html = html.replace(/<link rel="icon"[^>]*>|<link rel="apple-touch-icon"[^>]*>|<link rel="manifest"[^>]*>|<meta name="theme-color"[^>]*>/g, '');
+    write(target, html.replace('</head>', `${brandIconHead}</head>`));
+  });
+}
+
 addHreflangToStaticPages();
-Promise.all([optimizeImages(), generateOgImages()]).then(async ([images, og]) => {
+addBrandIconsToAllPages();
+Promise.all([optimizeImages(), generateOgImages(), generateBrandIcons()]).then(async ([images, og]) => {
   await updateStaticSocialMeta();
-  console.log(`Built ${works.length} static work pages, sitemap and optimized images (${images.created} processed, ${images.skipped} cached; OG ${og.created} created, ${og.skipped} cached).`);
+  console.log(`Built ${works.length} static work pages, ${redirectCount} legacy redirect pages, sitemap and optimized images (${images.created} processed, ${images.skipped} cached; OG ${og.created} created, ${og.skipped} cached).`);
 }).catch(error => { console.error(error); process.exitCode = 1; });

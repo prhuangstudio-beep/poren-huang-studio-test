@@ -33,7 +33,7 @@
   text-overflow: clip !important;
   color: #111 !important;
   font-size: clamp(17px, 1.5vw, 26px) !important;
-  font-weight: 800 !important;
+  font-weight: 900 !important;
   line-height: 1.08 !important;
 }
 
@@ -43,7 +43,7 @@
   max-width: 100% !important;
   color: #111 !important;
   font: inherit !important;
-  font-weight: 800 !important;
+  font-weight: 900 !important;
   line-height: 1.08 !important;
   white-space: normal !important;
   overflow-wrap: normal !important;
@@ -409,7 +409,7 @@
   margin-left: auto !important;
   margin-right: auto !important;
   display: grid !important;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   gap: clamp(72px, 8vw, 150px) clamp(18px, 2.4vw, 34px) !important;
 }
 
@@ -429,12 +429,6 @@
 .works-overview .works-card-meta {
   align-items: center !important;
   text-align: center !important;
-}
-
-@media(max-width:1100px) {
-  .works-overview .works-image-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  }
 }
 
 @media(max-width:800px) {

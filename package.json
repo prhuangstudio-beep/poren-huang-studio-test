@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "build": "node scripts/build.js"
+    "build": "node scripts/build.js",
+    "check": "node scripts/preflight-check.js"
   },
   "devDependencies": {
     "sharp": "^0.35.4"
