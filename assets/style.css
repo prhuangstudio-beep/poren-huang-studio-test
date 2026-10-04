@@ -4672,6 +4672,36 @@ body.home::before,body.home::after{display:none!important;content:none!important
   border-radius:clamp(4px,.45vw,7px)!important;
 }
 
+/* Work imagery is rendered through several nested elements across legacy and
+   generated work pages.  Round every layer of the artwork window so no route
+   falls back to a square corner. */
+.work-main,
+.work-main picture,
+.work-main img,
+.work-thumbnails button,
+.work-thumbnails picture,
+.work-thumbnails img,
+.works-image-grid figure,
+.works-image-grid figure picture,
+.works-image-grid figure img,
+.work-list figure,
+.work-list figure picture,
+.work-list figure img,
+.work-variants a,
+.work-variants picture,
+.work-variants img,
+.related-works img,
+.related-works picture,
+.related-works .square-media{
+  border-radius:clamp(6px,.65vw,10px)!important;
+}
+.works-image-grid figure,
+.work-list figure,
+.work-variants a,
+.related-works .square-media{
+  overflow:hidden;
+}
+
 /* Still images share the gallery's subtle softened edge.  Moving media stays square. */
 img{border-radius:clamp(4px,.45vw,7px)}
 .horizontal-image-ticker img,
