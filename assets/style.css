@@ -4707,13 +4707,13 @@ body.home::before,body.home::after{display:none!important;content:none!important
   html,html *{cursor:none!important}
   .site-cursor,
   .site-cursor.is-active{
-    width:72px!important;
-    height:72px!important;
+    width:86px!important;
+    height:48px!important;
     left:-15px!important;
-    top:-64px!important;
+    top:-44px!important;
     border:0!important;
     border-radius:0!important;
-    background:url('media/ui/outline-cursor.svg') center/contain no-repeat!important;
+    background:url('media/ui/custom-outline-cursor.png') center/contain no-repeat!important;
     color:transparent!important;
     opacity:0;
     transition:opacity .12s ease!important;
