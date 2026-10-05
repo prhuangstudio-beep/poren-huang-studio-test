@@ -18,7 +18,7 @@ window.addEventListener('pageshow',()=>{
   window.scrollTo(0,0);
 });
 
-if(matchMedia('(pointer:fine)').matches){
+if(matchMedia('(any-pointer:fine)').matches){
   const cursor=document.createElement('i');
   cursor.className='site-cursor';
   document.body.append(cursor);

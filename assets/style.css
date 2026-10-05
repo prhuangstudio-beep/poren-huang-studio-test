@@ -4703,7 +4703,7 @@ body.home::before,body.home::after{display:none!important;content:none!important
 }
 
 /* Desktop cursor: a single quiet outline arrow replaces the former rings. */
-@media (pointer:fine){
+@media (any-pointer:fine){
   html,html *{cursor:none!important}
   .site-cursor,
   .site-cursor.is-active{
