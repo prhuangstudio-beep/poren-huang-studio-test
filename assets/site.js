@@ -18,11 +18,12 @@ window.addEventListener('pageshow',()=>{
   window.scrollTo(0,0);
 });
 
-if(matchMedia('(any-pointer:fine)').matches){
+const canUseCustomCursor=matchMedia('(hover:hover)').matches||matchMedia('(any-pointer:fine)').matches||location.search.includes('cursor=');
+if(canUseCustomCursor){
   const cursor=document.createElement('i');
   cursor.className='site-cursor';
   document.body.append(cursor);
-  let cursorX=0,cursorY=0,cursorFrame=0;
+  let cursorX=window.innerWidth/2,cursorY=window.innerHeight/2,cursorFrame=0;
   const renderCursor=()=>{
     cursorFrame=0;
     cursor.style.transform=`translate3d(${cursorX}px,${cursorY}px,0)`;
@@ -33,7 +34,11 @@ if(matchMedia('(any-pointer:fine)').matches){
     if(!cursorFrame)cursorFrame=requestAnimationFrame(renderCursor);
     cursor.classList.add('is-visible');
   };
-  window.addEventListener('onpointerrawupdate'in window?'pointerrawupdate':'pointermove',moveCursor,{passive:true});
+  renderCursor();
+  cursor.classList.add('is-visible');
+  document.documentElement.classList.add('custom-cursor-ready');
+  window.addEventListener('pointermove',moveCursor,{passive:true});
+  window.addEventListener('mousemove',moveCursor,{passive:true});
   document.addEventListener('mouseover',e=>{
     cursor.classList.toggle('is-active',!!e.target.closest('a,button,[role="button"],input,select,textarea,.work-stage,.news article'));
   });

@@ -4703,8 +4703,9 @@ body.home::before,body.home::after{display:none!important;content:none!important
 }
 
 /* Desktop cursor: a single quiet outline arrow replaces the former rings. */
-html,html *{cursor:url('media/ui/outline-cursor-standard.png?v=20261005cursor5') 3 3,auto!important}
-.site-cursor,.site-cursor.is-active{display:none!important}
+.site-cursor,.site-cursor.is-active{position:fixed!important;z-index:2147483647!important;display:block!important;width:42px!important;height:78px!important;left:0!important;top:0!important;border:0!important;border-radius:0!important;background:url('media/ui/outline-cursor-standard.png?v=20261005cursor6') left top/contain no-repeat!important;color:transparent!important;pointer-events:none!important;opacity:0;transition:opacity .12s ease!important}
+.site-cursor.is-visible{opacity:1!important}
+html.custom-cursor-ready,html.custom-cursor-ready *{cursor:none!important}
 
 /* Still images share the gallery's subtle softened edge.  Moving media stays square. */
 img{border-radius:clamp(4px,.45vw,7px)}
