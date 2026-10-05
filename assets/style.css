@@ -4703,7 +4703,7 @@ body.home::before,body.home::after{display:none!important;content:none!important
 }
 
 /* Desktop cursor: a single quiet outline arrow replaces the former rings. */
-html,html *{cursor:url('media/ui/outline-cursor-standard.png') 3 3,auto!important}
+html,html *{cursor:url('media/ui/outline-cursor-standard.png?v=20261005cursor5') 3 3,auto!important}
 .site-cursor,.site-cursor.is-active{display:none!important}
 
 /* Still images share the gallery's subtle softened edge.  Moving media stays square. */
