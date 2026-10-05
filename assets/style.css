@@ -4702,6 +4702,26 @@ body.home::before,body.home::after{display:none!important;content:none!important
   overflow:hidden;
 }
 
+/* Desktop cursor: a single quiet outline arrow replaces the former rings. */
+@media (pointer:fine){
+  html,html *{cursor:none!important}
+  .site-cursor,
+  .site-cursor.is-active{
+    width:72px!important;
+    height:72px!important;
+    left:-15px!important;
+    top:-64px!important;
+    border:0!important;
+    border-radius:0!important;
+    background:url('media/ui/outline-cursor.svg') center/contain no-repeat!important;
+    color:transparent!important;
+    opacity:0;
+    transition:opacity .12s ease!important;
+  }
+  .site-cursor::after{content:none!important;display:none!important}
+  .site-cursor.is-visible{opacity:1!important}
+}
+
 /* Still images share the gallery's subtle softened edge.  Moving media stays square. */
 img{border-radius:clamp(4px,.45vw,7px)}
 .horizontal-image-ticker img,
